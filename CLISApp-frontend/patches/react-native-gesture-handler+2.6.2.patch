@@ -1,0 +1,31 @@
+diff --git a/node_modules/react-native-gesture-handler/RNGestureHandler.podspec b/node_modules/react-native-gesture-handler/RNGestureHandler.podspec
+index fed3e8a..fc3226d 100644
+--- a/node_modules/react-native-gesture-handler/RNGestureHandler.podspec
++++ b/node_modules/react-native-gesture-handler/RNGestureHandler.podspec
+@@ -2,7 +2,7 @@ require "json"
+ 
+ fabric_enabled = ENV['RCT_NEW_ARCH_ENABLED'] == '1'
+ 
+-isUserApp = File.exists?(File.join(__dir__, "..", "..", "node_modules", "react-native", "package.json"))
++isUserApp = File.exist?(File.join(__dir__, "..", "..", "node_modules", "react-native", "package.json"))
+ if isUserApp
+   libInstances = %x[find ../../ -name "package.json" | grep "/react-native-gesture-handler/package.json" | grep -v "/.yarn/"]
+   libInstancesArray = libInstances.split("\n")
+diff --git a/node_modules/react-native-gesture-handler/android/src/main/java/com/swmansion/gesturehandler/react/RNGestureHandlerModule.kt b/node_modules/react-native-gesture-handler/android/src/main/java/com/swmansion/gesturehandler/react/RNGestureHandlerModule.kt
+index 9c89b93..9ba10ee 100644
+--- a/node_modules/react-native-gesture-handler/android/src/main/java/com/swmansion/gesturehandler/react/RNGestureHandlerModule.kt
++++ b/node_modules/react-native-gesture-handler/android/src/main/java/com/swmansion/gesturehandler/react/RNGestureHandlerModule.kt
+@@ -427,7 +427,12 @@ class RNGestureHandlerModule(reactContext: ReactApplicationContext?)
+     return try {
+       SoLoader.loadLibrary("gesturehandler")
+       val jsContext = reactApplicationContext.javaScriptContextHolder
+-      decorateRuntime(jsContext.get())
++      val jsContextPtr = jsContext?.get()
++      if (jsContextPtr == null || jsContextPtr == 0L) {
++        Log.w("[RNGestureHandler]", "JSI runtime pointer is null; skipping decorateRuntime")
++        return false
++      }
++      decorateRuntime(jsContextPtr)
+       true
+     } catch (exception: Exception) {
+       Log.w("[RNGestureHandler]", "Could not install JSI bindings.")

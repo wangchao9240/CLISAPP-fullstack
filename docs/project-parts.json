@@ -1,0 +1,35 @@
+{
+  "project_root": "/Users/wang/Documents/qut/current_semester/IFN735_25se2_Industry_Project/CLISAPP",
+  "repository_type": "monorepo",
+  "parts": [
+    {
+      "part_id": "frontend",
+      "display_name": "CLISApp Frontend (Mobile)",
+      "relative_path": "CLISApp-frontend",
+      "root_path": "/Users/wang/Documents/qut/current_semester/IFN735_25se2_Industry_Project/CLISAPP/CLISApp-frontend",
+      "project_type_id": "mobile",
+      "primary_tech": "React Native",
+      "key_files": [
+        "package.json",
+        "app.json",
+        "ios/Podfile",
+        "android/app/build.gradle",
+        "tsconfig.json"
+      ]
+    },
+    {
+      "part_id": "backend",
+      "display_name": "CLISApp Backend (API)",
+      "relative_path": "CLISApp-backend",
+      "root_path": "/Users/wang/Documents/qut/current_semester/IFN735_25se2_Industry_Project/CLISAPP/CLISApp-backend",
+      "project_type_id": "backend",
+      "primary_tech": "Python FastAPI",
+      "key_files": [
+        "requirements.txt",
+        "app/main.py",
+        "docker-compose.yml",
+        "Dockerfile"
+      ]
+    }
+  ]
+}
