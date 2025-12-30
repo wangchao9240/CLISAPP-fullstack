@@ -1,0 +1,26 @@
+<PAMDataset>
+  <Subdataset name="pm2p5">
+    <PAMDataset>
+      <PAMRasterBand band="1">
+        <Metadata>
+          <MDI key="STATISTICS_MAXIMUM">3.5116887175946e-08</MDI>
+          <MDI key="STATISTICS_MEAN">6.045656513801e-09</MDI>
+          <MDI key="STATISTICS_MINIMUM">5.6412208238044e-10</MDI>
+          <MDI key="STATISTICS_STDDEV">2.964286653122e-09</MDI>
+        </Metadata>
+      </PAMRasterBand>
+    </PAMDataset>
+  </Subdataset>
+  <Subdataset name="valid_time">
+    <PAMDataset>
+      <PAMRasterBand band="1">
+        <Metadata>
+          <MDI key="STATISTICS_MAXIMUM">1763794800</MDI>
+          <MDI key="STATISTICS_MEAN">1763794800</MDI>
+          <MDI key="STATISTICS_MINIMUM">1763794800</MDI>
+          <MDI key="STATISTICS_STDDEV">0</MDI>
+        </Metadata>
+      </PAMRasterBand>
+    </PAMDataset>
+  </Subdataset>
+</PAMDataset>

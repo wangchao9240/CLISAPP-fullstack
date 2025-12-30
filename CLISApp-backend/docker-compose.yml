@@ -1,0 +1,121 @@
+services:
+  # CLISApp Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: clisapp-backend:latest
+    container_name: clisapp-backend
+    ports:
+      - "8080:8080"
+    environment:
+      # Application settings
+      - APP_NAME=CLISApp Backend
+      - APP_VERSION=1.0.0
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      
+      # Server config
+      - HOST=0.0.0.0
+      - PORT=8080
+      
+      # CORS - Allow frontend access
+      - FRONTEND_URL=http://localhost:19006
+      - ALLOWED_ORIGINS=["http://localhost:19006","http://localhost:3000","http://127.0.0.1:19006"]
+      
+      # Redis connection
+      - REDIS_URL=redis://redis:6379/0
+      
+      # Data paths (inside container)
+      - DATA_ROOT=/app/data
+      - TILES_PATH=/app/tiles
+      - DOWNLOADS_PATH=/app/data/downloads
+      - PROCESSING_PATH=/app/data/processing
+      
+      # API keys (set these in .env file)
+      - COPERNICUS_CDS_API_KEY=${COPERNICUS_CDS_API_KEY:-}
+      - NASA_USERNAME=${NASA_USERNAME:-}
+      - NASA_PASSWORD=${NASA_PASSWORD:-}
+      
+      # Tile settings
+      - TILE_SIZE=256
+      - MIN_ZOOM=6
+      - MAX_ZOOM=12
+    
+    volumes:
+      # Mount tiles directory for persistence
+      - ./tiles:/app/tiles:rw
+      # Mount data directory for persistence
+      - ./data:/app/data:rw
+      # Optional: mount environment file
+      # - ./.env:/app/.env:ro
+    
+    depends_on:
+      - redis
+    
+    restart: unless-stopped
+    
+    networks:
+      - clisapp-network
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Tile server (serves static tiles & related endpoints)
+  tile-server:
+    image: clisapp-backend:latest
+    container_name: clisapp-tile-server
+    command: ["uvicorn", "data_pipeline.servers.tile_server:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DATA_ROOT=/app/data
+      - TILES_PATH=/app/tiles
+    volumes:
+      - ./tiles:/app/tiles:ro
+      - ./data:/app/data:ro
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - clisapp-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # Redis cache service
+  redis:
+    image: redis:7-alpine
+    container_name: clisapp-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    networks:
+      - clisapp-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  # Redis persistent storage
+  redis-data:
+    driver: local
+
+networks:
+  clisapp-network:
+    driver: bridge
+
