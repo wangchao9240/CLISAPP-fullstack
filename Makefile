@@ -48,27 +48,67 @@ preflight: ## Validate configuration and dependencies before running services
 
 .PHONY: api-up
 api-up: ## Start the API service (port 8080)
-	@echo "[api-up] Not implemented yet - will start API on :8080"
+	@command -v python3 >/dev/null 2>&1 || { \
+		echo "  FAIL python3"; \
+		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
+		exit 1; \
+	}
+	@python3 scripts/api_service.py up
 
 .PHONY: api-down
 api-down: ## Stop the API service
-	@echo "[api-down] Not implemented yet - will stop API"
+	@command -v python3 >/dev/null 2>&1 || { \
+		echo "  FAIL python3"; \
+		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
+		exit 1; \
+	}
+	@python3 scripts/api_service.py down
 
 .PHONY: tiles-up
 tiles-up: ## Start the tile server (port 8000)
-	@echo "[tiles-up] Not implemented yet - will start tile server on :8000"
+	@command -v python3 >/dev/null 2>&1 || { \
+		echo "  FAIL python3"; \
+		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
+		exit 1; \
+	}
+	@python3 scripts/tiles_service.py up
 
 .PHONY: tiles-down
 tiles-down: ## Stop the tile server
-	@echo "[tiles-down] Not implemented yet - will stop tile server"
+	@command -v python3 >/dev/null 2>&1 || { \
+		echo "  FAIL python3"; \
+		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
+		exit 1; \
+	}
+	@python3 scripts/tiles_service.py down
 
 .PHONY: up
 up: ## Start all services (API + tile server)
-	@echo "[up] Not implemented yet - will start all services"
+	@set -e; \
+	$(MAKE) api-up; \
+	if ! $(MAKE) tiles-up; then \
+		echo ""; \
+		echo "  ✗ tiles-up failed; stopping API service..."; \
+		$(MAKE) api-down >/dev/null 2>&1 || true; \
+		exit 1; \
+	fi
+	@echo ""
+	@echo "  ✓ All services started"
+	@echo ""
+	@echo "  Platform Connectivity Note:"
+	@echo "  - iOS Simulator:      Use http://localhost:8080 and http://localhost:8000"
+	@echo "  - Android Emulator:   Use http://10.0.2.2:8080 and http://10.0.2.2:8000"
+	@echo ""
 
 .PHONY: down
 down: ## Stop all services
-	@echo "[down] Not implemented yet - will stop all services"
+	@rc=0; \
+	$(MAKE) api-down || rc=$$?; \
+	$(MAKE) tiles-down || rc=$$?; \
+	if [ $$rc -ne 0 ]; then exit $$rc; fi
+	@echo ""
+	@echo "  ✓ All services stopped"
+	@echo ""
 
 # ==============================================================================
 # STATUS & LOGGING
@@ -76,19 +116,127 @@ down: ## Stop all services
 
 .PHONY: status
 status: ## Show status of running services
-	@echo "[status] Not implemented yet - will show service health"
+	@command -v python3 >/dev/null 2>&1 || { \
+		echo "  FAIL python3"; \
+		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
+		exit 1; \
+	}
+	@python3 scripts/status.py
 
 .PHONY: logs
 logs: ## View service logs
-	@echo "[logs] Not implemented yet - will show logs"
+	@command -v python3 >/dev/null 2>&1 || { \
+		echo "  FAIL python3"; \
+		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
+		exit 1; \
+	}
+	@python3 scripts/logs.py
 
 # ==============================================================================
 # PIPELINE
 # ==============================================================================
 
 .PHONY: pipeline
-pipeline: ## Run data pipeline
-	@echo "[pipeline] Not implemented yet - will run data pipeline"
+pipeline: ## Run all layer pipelines (PM2.5, precipitation, temp, humidity, UV)
+	@command -v python3 >/dev/null 2>&1 || { \
+		echo "  FAIL python3"; \
+		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
+		exit 1; \
+	}
+	@python3 scripts/pipeline.py
+
+.PHONY: pipeline-all
+pipeline-all: pipeline ## Alias for 'pipeline' - run all layer pipelines
+
+.PHONY: pipeline-download
+pipeline-download: ## Run download stage for specific layer (requires LAYER=...)
+	@command -v python3 >/dev/null 2>&1 || { \
+		echo "  FAIL python3"; \
+		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
+		exit 1; \
+	}
+	@if [ -z "$(LAYER)" ]; then \
+		echo "Error: LAYER parameter is required"; \
+		echo "Usage: make pipeline-download LAYER=<layer>"; \
+		echo "Supported layers: pm25, precipitation, uv, temperature, humidity"; \
+		exit 1; \
+	fi
+	@python3 scripts/pipeline_stage.py download --layer $(LAYER)
+
+.PHONY: pipeline-process
+pipeline-process: ## Run process stage for specific layer (requires LAYER=...)
+	@command -v python3 >/dev/null 2>&1 || { \
+		echo "  FAIL python3"; \
+		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
+		exit 1; \
+	}
+	@if [ -z "$(LAYER)" ]; then \
+		echo "Error: LAYER parameter is required"; \
+		echo "Usage: make pipeline-process LAYER=<layer>"; \
+		echo "Supported layers: pm25, precipitation, uv, temperature, humidity"; \
+		exit 1; \
+	fi
+	@python3 scripts/pipeline_stage.py process --layer $(LAYER)
+
+.PHONY: pipeline-tiles
+pipeline-tiles: ## Run tiles generation stage for specific layer (requires LAYER=...)
+	@command -v python3 >/dev/null 2>&1 || { \
+		echo "  FAIL python3"; \
+		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
+		exit 1; \
+	}
+	@if [ -z "$(LAYER)" ]; then \
+		echo "Error: LAYER parameter is required"; \
+		echo "Usage: make pipeline-tiles LAYER=<layer>"; \
+		echo "Supported layers: pm25, precipitation, uv, temperature, humidity"; \
+		exit 1; \
+	fi
+	@python3 scripts/pipeline_stage.py tiles --layer $(LAYER)
+
+.PHONY: pipeline-pm25
+pipeline-pm25: ## Run PM2.5 layer pipeline
+	@command -v python3 >/dev/null 2>&1 || { \
+		echo "  FAIL python3"; \
+		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
+		exit 1; \
+	}
+	@python3 scripts/run_pipeline_layer.py pm25
+
+.PHONY: pipeline-precip
+pipeline-precip: ## Run precipitation layer pipeline
+	@command -v python3 >/dev/null 2>&1 || { \
+		echo "  FAIL python3"; \
+		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
+		exit 1; \
+	}
+	@python3 scripts/run_pipeline_layer.py precip
+
+.PHONY: pipeline-temp
+pipeline-temp: ## Run temperature layer pipeline
+	@command -v python3 >/dev/null 2>&1 || { \
+		echo "  FAIL python3"; \
+		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
+		exit 1; \
+	}
+	@python3 scripts/run_pipeline_layer.py temp
+
+.PHONY: pipeline-humidity
+pipeline-humidity: ## Run humidity layer pipeline
+	@command -v python3 >/dev/null 2>&1 || { \
+		echo "  FAIL python3"; \
+		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
+		exit 1; \
+	}
+	@python3 scripts/run_pipeline_layer.py humidity
+
+.PHONY: pipeline-uv
+pipeline-uv: ## Run UV layer pipeline
+	@command -v python3 >/dev/null 2>&1 || { \
+		echo "  FAIL python3"; \
+		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
+		exit 1; \
+	}
+	@python3 scripts/run_pipeline_layer.py uv
 
 # ==============================================================================
 # VERIFICATION
@@ -97,6 +245,15 @@ pipeline: ## Run data pipeline
 .PHONY: verify
 verify: ## Run verification/health checks
 	@echo "[verify] Not implemented yet - will run health checks"
+
+.PHONY: check-boundaries
+check-boundaries: ## Check architectural boundaries (app/ vs data_pipeline/ separation)
+	@command -v python3 >/dev/null 2>&1 || { \
+		echo "  FAIL python3"; \
+		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
+		exit 1; \
+	}
+	@python3 scripts/check_boundaries.py
 
 # ==============================================================================
 # ALIASES (for continuity with existing workflows)
