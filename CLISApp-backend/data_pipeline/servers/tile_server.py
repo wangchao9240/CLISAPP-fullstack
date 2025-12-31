@@ -16,6 +16,7 @@ from fastapi.responses import Response
 import rasterio
 import math
 import json
+from itertools import islice
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,12 @@ ASSET_TILES = {
 
 LAST_PLACEHOLDER = {}
 
+def _first_png(root: Path) -> Path | None:
+    try:
+        return next(root.rglob("*.png"))
+    except StopIteration:
+        return None
+
 @app.get("/")
 async def root():
     """Root endpoint"""
@@ -67,17 +74,33 @@ async def root():
     }
 
 @app.get("/health")
-async def health_check():
+async def health_check(include_stats: bool = False, max_files: int = 2000):
     """Health check compatible with frontend HealthStatus interface"""
     from datetime import datetime
     
-    tiles_exist = TILES_DIR.exists() and any(TILES_DIR.rglob("*.png"))
-    total_tiles = len(list(TILES_DIR.rglob("*.png"))) if tiles_exist else 0
-    
-    # Calculate total size
-    total_size_mb = 0
-    if tiles_exist:
-        total_size_mb = sum(f.stat().st_size for f in TILES_DIR.rglob("*.png")) / 1024 / 1024
+    root = TILES_DIR
+    sample_png = _first_png(root) if root.exists() else None
+    tiles_exist = sample_png is not None
+
+    total_tiles = None
+    total_size_mb = None
+    stats_truncated = None
+    if include_stats and tiles_exist:
+        total_tiles = 0
+        total_size_bytes = 0
+        stats_truncated = False
+
+        for idx, png in enumerate(root.rglob("*.png")):
+            if idx >= max_files:
+                stats_truncated = True
+                break
+            total_tiles += 1
+            try:
+                total_size_bytes += png.stat().st_size
+            except OSError:
+                pass
+
+        total_size_mb = round(total_size_bytes / 1024 / 1024, 2)
     
     # Return format expected by frontend
     return {
@@ -89,7 +112,9 @@ async def health_check():
         "tiles_directory": str(TILES_DIR),
         "tiles_available": tiles_exist,
         "total_tiles": total_tiles,
-        "total_size_mb": round(total_size_mb, 2),
+        "total_size_mb": total_size_mb,
+        "stats_truncated": stats_truncated,
+        "stats_max_files": max_files if include_stats else None,
         "tile_format": "PNG with transparency",
         "supported_zoom_levels": "6-13"
     }
@@ -167,8 +192,15 @@ async def get_pm25_info():
             for zoom_dir in layer_dir.iterdir():
                 if zoom_dir.is_dir() and zoom_dir.name.isdigit():
                     zoom = int(zoom_dir.name)
-                    tile_count = len(list(zoom_dir.rglob("*.png")))
-                    tile_size = sum(f.stat().st_size for f in zoom_dir.rglob("*.png")) / 1024 / 1024
+                    tile_count = 0
+                    total_bytes = 0
+                    for f in zoom_dir.rglob("*.png"):
+                        tile_count += 1
+                        try:
+                            total_bytes += f.stat().st_size
+                        except OSError:
+                            pass
+                    tile_size = total_bytes / 1024 / 1024
                     tiles_by_zoom[zoom] = {
                         "count": tile_count,
                         "size_mb": round(tile_size, 2)
@@ -234,8 +266,15 @@ async def get_precipitation_info():
             for zoom_dir in layer_dir.iterdir():
                 if zoom_dir.is_dir() and zoom_dir.name.isdigit():
                     zoom = int(zoom_dir.name)
-                    tile_count = len(list(zoom_dir.rglob("*.png")))
-                    tile_size = sum(f.stat().st_size for f in zoom_dir.rglob("*.png")) / 1024 / 1024
+                    tile_count = 0
+                    total_bytes = 0
+                    for f in zoom_dir.rglob("*.png"):
+                        tile_count += 1
+                        try:
+                            total_bytes += f.stat().st_size
+                        except OSError:
+                            pass
+                    tile_size = total_bytes / 1024 / 1024
                     tiles_by_zoom[zoom] = {
                         "count": tile_count,
                         "size_mb": round(tile_size, 2)
@@ -373,18 +412,16 @@ async def test_tiles():
         for zoom_dir in sorted((TILES_DIR / "pm25").iterdir()):
             if zoom_dir.is_dir() and zoom_dir.name.isdigit():
                 zoom = int(zoom_dir.name)
-                png_files = list(zoom_dir.rglob("*.png"))
-                if png_files:
-                    # Take the first 3 tiles as samples
-                    for png_file in png_files[:3]:
-                        parts = png_file.parts
-                        x = parts[-2]  # parent directory name
-                        y = png_file.stem  # filename without extension
-                        available_tiles.append({
-                            "tile": f"{zoom}/{x}/{y}",
-                            "url": f"/tiles/pm25/{zoom}/{x}/{y}.png",
-                            "size_bytes": png_file.stat().st_size
-                        })
+                # Take the first 3 tiles as samples (avoid materializing the full file list)
+                for png_file in islice(zoom_dir.rglob("*.png"), 3):
+                    parts = png_file.parts
+                    x = parts[-2]  # parent directory name
+                    y = png_file.stem  # filename without extension
+                    available_tiles.append({
+                        "tile": f"{zoom}/{x}/{y}",
+                        "url": f"/tiles/pm25/{zoom}/{x}/{y}.png",
+                        "size_bytes": png_file.stat().st_size
+                    })
     
     return {
         "test_tiles": test_results,
@@ -406,18 +443,16 @@ async def tile_demo():
     """Tile demo page - return simple HTML preview"""
     # Find one available tile
     sample_tile = None
-    if TILES_DIR.exists():
-        for zoom_dir in (TILES_DIR / "pm25").iterdir():
-            if zoom_dir.is_dir() and zoom_dir.name.isdigit():
-                png_files = list(zoom_dir.rglob("*.png"))
-                if png_files:
-                    png_file = png_files[0]
-                    parts = png_file.parts
-                    zoom = parts[-3]
-                    x = parts[-2]
-                    y = png_file.stem
-                    sample_tile = f"{zoom}/{x}/{y}"
-                    break
+    layer_dir = TILES_DIR / "pm25"
+    if layer_dir.exists():
+        png_file = _first_png(layer_dir)
+        if png_file:
+            rel = png_file.relative_to(layer_dir)
+            if len(rel.parts) >= 3:
+                zoom = rel.parts[0]
+                x = rel.parts[1]
+                y = Path(rel.parts[-1]).stem
+                sample_tile = f"{zoom}/{x}/{y}"
     
     html_content = f"""
     <!DOCTYPE html>

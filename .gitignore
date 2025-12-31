@@ -26,6 +26,9 @@ __pycache__/
 *$py.class
 *.so
 
+# Local service state folders created by make/test runs
+tmp_api_state_*/
+
 # Distribution / packaging
 .Python
 build/
