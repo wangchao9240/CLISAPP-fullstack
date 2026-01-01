@@ -18,8 +18,10 @@ Defined in `CLISApp-frontend/src/constants/apiEndpoints.ts`.
 
 ### Production
 
-- API base: `https://clisapp-api.qut.edu.au`
-- Tile base: `https://clisapp-api.qut.edu.au/api/v1/tiles`
+- API base: `API_BASE_URL` (e.g., `https://clisapp-api.qut.edu.au`)
+- Tile base: `TILE_SERVER_URL` (e.g., `https://clisapp-tiles.qut.edu.au/tiles`)
+  - The mobile app should point to the dedicated tile service for images.
+  - Using the API `/api/v1/tiles/*` as a tile image base is deprecated (Phase 2 removal).
 
 ## API Calls Implemented
 
@@ -27,7 +29,7 @@ Implemented in `CLISApp-frontend/src/services/ApiService.ts`.
 
 ### Health
 
-- `checkHealth()` → `GET {BASE_URL}/health`
+- `checkHealth()` → `GET {BASE_URL}/api/v1/health`
 
 ### Regions
 
@@ -38,19 +40,23 @@ Implemented in `CLISApp-frontend/src/services/ApiService.ts`.
 - `getRegionClimateData(regionId, layers?)` → `GET {BASE_URL}/api/v1/regions/{regionId}/climate?layers=...`
 - `getRegionBoundary(regionId)` → `GET {BASE_URL}/api/v1/regions/{regionId}/boundary`
 
-### Tiles
+### Tiles (Phase 1 - Aligned)
 
-- `getTileStatus()` → `GET {BASE_URL}/tiles/pm25/info`
-- `getLayerMetadata(layer, level)` → `GET {BASE_URL}/tiles/{layer}/{level}/metadata`
+- `getTileStatus()` → `GET {BASE_URL}/api/v1/tiles/status`
+- `getLayerMetadata(layer, level)` → `GET {BASE_URL}/api/v1/tiles/{layer}/{level}/metadata`
 
 ### Tile URL generation for map overlay
 
 - `getTileUrl(layer, level, z, x, y, format?)` → `{TILE_SERVER_URL}/{layer}/{level}/{z}/{x}/{y}.{format}`
-  - In development, `TILE_SERVER_URL` defaults to `http://localhost:8000/tiles` (no `/api/v1`).
+  - In development, `TILE_SERVER_URL` defaults to `http://localhost:8000/tiles`
+  - The tile server (port 8000) supports both canonical and legacy formats:
+    - **Canonical** (Phase 1): `/tiles/{layer}/{level}/{z}/{x}/{y}.png`
+    - **Legacy** (Phase 0): `/tiles/{layer}/{z}/{x}/{y}.png` (deprecated)
 
-## Notes / Potential Mismatches
+## Phase 1 Compatibility Notes
 
-- Backend main API mounts health under `/api/v1/health`, but frontend health is configured as `/health`.
-- Backend phase-0 tile server uses `/tiles/{layer}/{z}/{x}/{y}.png` (no `level`), while frontend generates `/tiles/{layer}/{level}/{z}/{x}/{y}.{format}`.
+- **Health endpoints**: Backend provides both `/health` (legacy, deprecated) and `/api/v1/health` (canonical). Frontend uses the canonical `/api/v1/health`.
+- **Tile URLs**: The mobile app uses `TILE_SERVER_URL` for tile images in all environments.
+- **Tile metadata**: Uses canonical API routes (`/api/v1/tiles/*`) for consistency.
 
-These differences should be validated and aligned to avoid dev/prod inconsistencies.
+All Phase 0 legacy endpoints are deprecated and will be removed in Phase 2.

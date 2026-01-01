@@ -2,12 +2,24 @@
 
 ## Overview
 
-CLISApp is an integrated mobile + backend system:
+CLISApp is an integrated mobile + backend system with a two-service topology:
 
 - **Mobile app (React Native)** renders map UI.
-- **Backend API (FastAPI)** provides region search/info and tile metadata.
-- **Tile server (FastAPI, phase 0)** serves raster tile PNGs for climate layers.
+- **Backend API (FastAPI, port 8080)** provides region search/info, tile metadata/status, and health endpoints.
+- **Tile server (FastAPI, port 8000, Phase 1)** serves raster tile PNGs for climate layers with level-aware routing.
 - **Base map tiles** come from OpenStreetMap providers (public tile servers).
+
+### Canonical Topology (Phase 1)
+
+**Development:**
+- API service on `:8080` for JSON endpoints (`/api/v1/*`)
+- Tile server on `:8000` for tile images (`/tiles/*`) and tile-server health (`/health`)
+
+**Production (Render):**
+- `clisapp-api` service provides `/api/v1/*` endpoints
+- `clisapp-tiles` service provides `/tiles/*` tile images (canonical Phase 1 shape)
+
+**Deprecated:** Static tile mount on `:8080/tiles/*` (disabled by default in Phase 1, removed in Phase 2)
 
 ## Data Flow
 
@@ -35,19 +47,39 @@ Calls include region endpoints under `/api/v1/regions/*`.
   - iOS simulator: `http://localhost:8000/tiles`
   - Android emulator: `http://10.0.2.2:8000/tiles`
 
-Tiles are requested as `{tile_base}/{layer}/{...}/{z}/{x}/{y}.png` depending on implementation.
+Tiles are requested as `{tile_base}/{layer}/{level}/{z}/{x}/{y}.png` using the canonical Phase 1 format.
 
 ### Frontend → OpenStreetMap
 
 - Base tiles use public OSM tile servers (CartoDB light/dark, standard OSM, etc.).
 
-## Compatibility Notes
+## Phase 1 Contract Alignment
 
-The repository currently contains **two tile contract shapes**:
+All tile contracts have been aligned in Phase 1:
 
-- Main API tile endpoint includes an extra `level` segment: `/api/v1/tiles/{layer}/{level}/...`
-- Phase 0 tile server omits `level`: `/tiles/{layer}/{z}/{x}/{y}.png`
+### Canonical Tile URL Format
 
-The frontend currently generates tile URLs including `level`, while also using some phase-0 endpoints for status (`/tiles/pm25/info`).
+**`/tiles/{layer}/{level}/{z}/{x}/{y}.png`**
 
-Before major feature development, it is recommended to align the dev/prod contract (single canonical tile endpoint shape).
+- `layer`: Climate layer (`pm25`, `precipitation`, `uv`, `humidity`, `temperature`)
+- `level`: Aggregation level (`lga` or `suburb`)
+- `z`, `x`, `y`: Tile coordinates
+
+### Supported by All Services
+
+- ✅ **Tile Server** (port 8000): `/tiles/{layer}/{level}/{z}/{x}/{y}.png`
+- ✅ **Main API** (port 8080): `/api/v1/tiles/*` metadata/status/on-demand generation (not the mobile tile base)
+- ✅ **Frontend**: Generates level-aware URLs for all tile requests
+
+### Tile Metadata Endpoints
+
+- Frontend uses canonical API routes:
+  - `GET /api/v1/tiles/status` - Overall tile status
+  - `GET /api/v1/tiles/{layer}/{level}/metadata` - Layer-specific metadata
+
+### Backward Compatibility
+
+Phase 0 legacy endpoints are preserved for transition but deprecated:
+- `/tiles/{layer}/{z}/{x}/{y}.png` (tile server, no level)
+- All legacy endpoints log deprecation warnings
+- **Planned removal**: Phase 2

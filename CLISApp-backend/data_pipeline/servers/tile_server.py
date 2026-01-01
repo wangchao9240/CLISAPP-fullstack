@@ -58,15 +58,18 @@ def _first_png(root: Path) -> Path | None:
 async def root():
     """Root endpoint"""
     return {
-        "message": "CLISApp Phase 0 Tile Server",
-        "version": "0.1.0",
+        "message": "CLISApp Tile Server (Phase 1)",
+        "version": "0.2.0",
         "status": "running",
         "endpoints": {
-            "tiles": "/tiles/pm25/{z}/{x}/{y}.png",
+            "tiles_level_aware": "/tiles/{layer}/{level}/{z}/{x}/{y}.png (canonical - Phase 1)",
+            "tiles_legacy": "/tiles/{layer}/{z}/{x}/{y}.png (deprecated - Phase 0 compatibility)",
             "info": "/tiles/pm25/info",
             "health": "/health",
             "test": "/tiles/pm25/test"
         },
+        "supported_layers": ["pm25", "precipitation", "temperature", "humidity", "uv"],
+        "supported_levels": ["suburb", "lga"],
         "documentation": {
             "openapi": "/docs",
             "redoc": "/redoc"
@@ -147,14 +150,77 @@ def build_tile_response(tile_path: Path, layer: str, z: int, x: int, y: int):
         }
     )
 
+@app.get("/tiles/{layer}/{level}/{z}/{x}/{y}.png")
+async def get_layer_tile_level_aware(layer: str, level: str, z: int, x: int, y: int):
+    """
+    Level-aware tile endpoint (Phase 1 canonical format)
+
+    Supports both aggregation levels: 'lga' and 'suburb'
+    Provides backward compatibility with Phase 0 tile layout.
+    """
+    allowed_layers = {"pm25", "humidity", "uv", "temperature", "precipitation"}
+    allowed_levels = {"lga", "suburb"}
+
+    if layer not in allowed_layers:
+        raise HTTPException(status_code=400, detail=f"Unsupported layer: {layer}")
+    if level not in allowed_levels:
+        raise HTTPException(status_code=400, detail=f"Invalid level: {level}. Must be 'lga' or 'suburb'")
+    if not (1 <= z <= 18):
+        raise HTTPException(status_code=400, detail="Invalid zoom")
+
+    # Try level-aware path first (Phase 1 layout)
+    level_aware_path = TILES_DIR / layer / level / str(z) / str(x) / f"{y}.png"
+
+    # Fall back to legacy layout if level-specific tile doesn't exist
+    legacy_path = TILES_DIR / layer / str(z) / str(x) / f"{y}.png"
+
+    # Prefer level-aware path, fall back to legacy
+    tile_path = level_aware_path if level_aware_path.exists() else legacy_path
+
+    # Special handling for precipitation layer (geographic bounds check)
+    if not tile_path.exists() and layer == "precipitation":
+        precip_tif = Path("data_pipeline/data/processed/gpm/imerg_daily_precip_qld.tif")
+        if precip_tif.exists():
+            with rasterio.open(precip_tif) as ds:
+                bounds = ds.bounds
+                lon_l = x / 2**z * 360.0 - 180.0
+                lon_r = (x + 1) / 2**z * 360.0 - 180.0
+                lat_t = math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * y / 2**z))))
+                lat_b = math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * (y + 1) / 2**z))))
+                if not (bounds.left <= lon_r and bounds.right >= lon_l and bounds.bottom <= lat_t and bounds.top >= lat_b):
+                    return Response(content=TRANSPARENT_TILE.getvalue(), media_type='image/png', headers={
+                        "Cache-Control": "public, max-age=300",
+                        "Access-Control-Allow-Origin": "*",
+                        "X-Tile-Info": f"precomputed zero tile for {layer}/{level} {z}/{x}/{y}"
+                    })
+
+    return build_tile_response(tile_path, layer, z, x, y)
+
+
 @app.get("/tiles/{layer}/{z}/{x}/{y}.png")
-async def get_layer_tile(layer: str, z: int, x: int, y: int):
-    """Generic layer tile: layer in {pm25, humidity, uv, temperature, precipitation}"""
+async def get_layer_tile_legacy(layer: str, z: int, x: int, y: int):
+    """
+    Legacy tile endpoint (Phase 0 format - DEPRECATED)
+
+    Provided for backward compatibility with Phase 0 frontend.
+    Defaults to 'suburb' level aggregation.
+
+    **Deprecation Notice**: This endpoint will be removed in Phase 2.
+    Please use /tiles/{layer}/{level}/{z}/{x}/{y}.png instead.
+    """
     allowed = {"pm25", "humidity", "uv", "temperature", "precipitation"}
     if layer not in allowed:
         raise HTTPException(status_code=400, detail=f"Unsupported layer: {layer}")
     if not (1 <= z <= 18):
         raise HTTPException(status_code=400, detail="Invalid zoom")
+
+    # Log deprecation warning
+    logger.warning(
+        f"Legacy tile endpoint accessed: /tiles/{layer}/{z}/{x}/{y}.png - "
+        "This is deprecated and will be removed in Phase 2. "
+        f"Please use /tiles/{layer}/suburb/{z}/{x}/{y}.png instead."
+    )
+
     tile_path = TILES_DIR / layer / str(z) / str(x) / f"{y}.png"
     if not tile_path.exists() and layer == "precipitation":
         # Check missing data within geographic bounds
@@ -172,7 +238,10 @@ async def get_layer_tile(layer: str, z: int, x: int, y: int):
                         "Access-Control-Allow-Origin": "*",
                         "X-Tile-Info": f"precomputed zero tile for {layer} {z}/{x}/{y}"
                     })
-    return build_tile_response(tile_path, layer, z, x, y)
+    response = build_tile_response(tile_path, layer, z, x, y)
+    response.headers["Deprecation"] = "true"
+    response.headers["Link"] = f'</tiles/{layer}/suburb/{z}/{x}/{y}.png>; rel="alternate"'
+    return response
 
 @app.get("/tiles/pm25/info")
 async def get_pm25_info():
@@ -240,7 +309,8 @@ async def get_pm25_info():
         "total_tiles": sum(stats["count"] for stats in tiles_by_zoom.values()),
         "total_size_mb": round(sum(stats["size_mb"] for stats in tiles_by_zoom.values()), 2),
         "api_endpoints": {
-            "tile_url_template": "/tiles/pm25/{z}/{x}/{y}.png",
+            "tile_url_template": "/tiles/pm25/{level}/{z}/{x}/{y}.png (canonical)",
+            "tile_url_template_legacy": "/tiles/pm25/{z}/{x}/{y}.png (deprecated)",
             "info": "/tiles/pm25/info",
             "test": "/tiles/pm25/test",
             "health": "/health"
@@ -313,7 +383,8 @@ async def get_precipitation_info():
         "total_tiles": sum(stats["count"] for stats in tiles_by_zoom.values()),
         "total_size_mb": round(sum(stats["size_mb"] for stats in tiles_by_zoom.values()), 2),
         "api_endpoints": {
-            "tile_url_template": "/tiles/precipitation/{z}/{x}/{y}.png",
+            "tile_url_template": "/tiles/precipitation/{level}/{z}/{x}/{y}.png (canonical)",
+            "tile_url_template_legacy": "/tiles/precipitation/{z}/{x}/{y}.png (deprecated)",
             "info": "/tiles/precipitation/info",
         }
     }
@@ -374,7 +445,8 @@ async def get_precipitation_info():
         "total_tiles": sum(stats["count"] for stats in tiles_by_zoom.values()),
         "total_size_mb": round(sum(stats["size_mb"] for stats in tiles_by_zoom.values()), 2),
         "api_endpoints": {
-            "tile_url_template": "/tiles/pm25/{z}/{x}/{y}.png",
+            "tile_url_template": "/tiles/pm25/{level}/{z}/{x}/{y}.png (canonical)",
+            "tile_url_template_legacy": "/tiles/pm25/{z}/{x}/{y}.png (deprecated)",
             "info": "/tiles/pm25/info",
             "test": "/tiles/pm25/test",
             "health": "/health"

@@ -17,10 +17,13 @@ import sys
 import subprocess
 from pathlib import Path
 
+from pipeline_prereqs import validate_prerequisites
+from pipeline_locations import LAYER_ALIASES, LAYER_OUTPUTS, normalize_layer
+from pipeline_logging import BACKEND_DIR, get_log_file, tee_stdio_to_file, update_latest_symlink
+
 
 # Paths (relative to repository root)
-REPO_ROOT = Path(__file__).parent.parent.absolute()
-BACKEND_DIR = REPO_ROOT / "CLISApp-backend"
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Python interpreter - prefer venv if available
 VENV_PYTHON = BACKEND_DIR / "venv" / "bin" / "python"
@@ -81,6 +84,7 @@ LAYER_CONFIGS = {
         "download": {
             "note": "Temperature uses Open-Meteo API - download is part of process stage",
             "skip": True,
+            "output_dir": "data/processing/temp",
         },
         "process": {
             "module": "data_pipeline.processing.temp.process_openmeteo_temp_to_tif",
@@ -95,6 +99,7 @@ LAYER_CONFIGS = {
         "download": {
             "note": "Humidity uses Open-Meteo API - download is part of process stage",
             "skip": True,
+            "output_dir": "data/processing/humidity",
         },
         "process": {
             "module": "data_pipeline.processing.humidity.process_openmeteo_humidity_to_tif",
@@ -129,10 +134,15 @@ def run_stage(stage, layer):
     Returns:
         Exit code (0 for success, non-zero for failure)
     """
+    layer = normalize_layer(layer)
+
     # Get layer configuration
     if layer not in LAYER_CONFIGS:
         print(f"Error: Unknown layer '{layer}'")
         print(f"Supported layers: {', '.join(LAYER_CONFIGS.keys())}")
+        if LAYER_ALIASES:
+            aliases = ", ".join(f"{k}→{v}" for k, v in sorted(LAYER_ALIASES.items()))
+            print(f"Aliases: {aliases}")
         return 1
 
     layer_config = LAYER_CONFIGS[layer]
@@ -142,6 +152,10 @@ def run_stage(stage, layer):
         return 1
 
     stage_config = layer_config[stage]
+
+    prereq_rc = validate_prerequisites(layer, stage)
+    if prereq_rc != 0:
+        return prereq_rc
 
     # Check if this stage should be skipped
     if stage_config.get("skip", False):
@@ -212,29 +226,62 @@ def main():
     parser.add_argument(
         "--layer",
         required=True,
-        choices=list(LAYER_CONFIGS.keys()),
+        choices=list(LAYER_CONFIGS.keys()) + list(LAYER_ALIASES.keys()),
         help="Climate data layer",
     )
 
     args = parser.parse_args()
 
-    # Print header
-    print_stage_header(args.stage, args.layer)
+    layer = normalize_layer(args.layer)
 
-    # Run stage
-    exit_code = run_stage(args.stage, args.layer)
+    log_file, latest_symlink = get_log_file(test_mode=TEST_MODE)
+    update_latest_symlink(log_file, latest_symlink)
+    log_label = str(log_file) if log_file is not None else "no log file (PIPELINE_TEST_MODE=1)"
 
-    # Print completion message
-    if exit_code == 0:
+    import time
+    with tee_stdio_to_file(log_file):
+        # Print header
+        print_stage_header(args.stage, layer)
+        print("Stages: download → process → tiles")
+        print(f"Log file: {log_label}")
         print()
-        print(f"✓ {args.stage.capitalize()} stage completed for {args.layer}")
-        print()
-    else:
-        print()
-        print(f"✗ {args.stage.capitalize()} stage failed for {args.layer} (exit code: {exit_code})")
+        outputs = LAYER_OUTPUTS.get(layer)
+        if outputs:
+            print("Output Locations:")
+            print(f"  Raw data:       CLISApp-backend/{outputs['raw_dir']}/")
+            print(f"  Processed data: CLISApp-backend/{outputs['processed_dir']}/")
+            print(f"  Tiles:          CLISApp-backend/{outputs['tiles_dir']}/")
+            print()
+
+        print(f"== {args.stage} ==")
         print()
 
-    return exit_code
+        start = time.monotonic()
+        exit_code = run_stage(args.stage, layer)
+        end = time.monotonic()
+
+        # Print completion message + duration summary
+        if TEST_MODE:
+            duration_str = "skipped"
+        else:
+            duration_str = f"{(end - start):.2f}s"
+
+        print()
+        print("STAGE SUMMARY")
+        print(f"  stage:   {args.stage}")
+        print(f"  layer:   {layer}")
+        print(f"  rc:      {exit_code}")
+        print(f"  elapsed: {duration_str}")
+        print()
+
+        if exit_code == 0:
+            print(f"✓ {args.stage.capitalize()} stage completed for {layer}")
+            print()
+        else:
+            print(f"✗ {args.stage.capitalize()} stage failed for {layer} (exit code: {exit_code})")
+            print()
+
+        return exit_code
 
 
 if __name__ == "__main__":

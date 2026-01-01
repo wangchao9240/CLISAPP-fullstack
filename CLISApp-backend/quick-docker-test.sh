@@ -116,12 +116,12 @@ else
 fi
 echo ""
 
-# 5.4 测试一个瓦片请求
-echo "4️⃣  测试瓦片请求："
-TILE_HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/tiles/pm25/8/241/155.png)
+# 5.4 测试瓦片请求 (Phase 1 canonical format with level)
+echo "4️⃣  测试瓦片请求 (canonical format)："
+TILE_HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/v1/tiles/pm25/suburb/8/241/155.png)
 if [ "$TILE_HTTP_CODE" = "200" ] || [ "$TILE_HTTP_CODE" = "404" ]; then
     if [ "$TILE_HTTP_CODE" = "200" ]; then
-        echo -e "${GREEN}   ✅ 瓦片请求成功 (HTTP 200)${NC}"
+        echo -e "${GREEN}   ✅ 瓦片请求成功 (HTTP 200) - /api/v1/tiles/pm25/suburb/8/241/155.png${NC}"
     else
         echo -e "${YELLOW}   ⚠️  瓦片未找到 (HTTP 404 - 正常，如果瓦片文件不存在)${NC}"
     fi

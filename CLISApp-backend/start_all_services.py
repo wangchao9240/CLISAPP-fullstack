@@ -1,7 +1,16 @@
 #!/usr/bin/env python3
 """
-CLISApp Backend - Unified Service Launcher
-Starts both Main API Service and Tile Server simultaneously
+CLISApp Backend - Unified Service Launcher (DEPRECATED)
+
+⚠️  DEPRECATED: This script is deprecated in Phase 1 and will be removed in Phase 2.
+
+Migration Path: Use the root Makefile instead
+  - For all services:  make up      (from repo root)
+  - For API only:      make api-up  (from repo root)
+  - For tiles only:    make tiles-up (from repo root)
+
+This script remains functional for backward compatibility but is no longer
+the recommended entry point.
 """
 
 import uvicorn
@@ -75,10 +84,21 @@ def signal_handler(sig, frame):
 
 def main():
     """Main entry point"""
+    # Display deprecation warning
+    print("=" * 70)
+    print("⚠️  DEPRECATION WARNING")
+    print("=" * 70)
+    print("\nThis script (start_all_services.py) is DEPRECATED and will be")
+    print("removed in Phase 2.")
+    print("\n📌 Recommended: Use 'make up' from the repo root instead")
+    print("\nContinuing for backward compatibility...\n")
+    print("=" * 70)
+    print()
+
     # Register signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
-    
+
     print("=" * 70)
     print(f"🌏 {settings.app_name} v{settings.app_version}")
     print("=" * 70)

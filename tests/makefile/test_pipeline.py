@@ -12,6 +12,7 @@ These tests validate:
 import os
 import subprocess
 from pathlib import Path
+import re
 
 import pytest
 
@@ -114,6 +115,41 @@ class TestPipelineTestMode:
             assert f"tiles/{layer_key}" in output, \
                 f"Output should mention tiles/{layer_key}\nOutput: {output}"
 
+    def test_pipeline_prints_log_file_path_and_creates_log(self):
+        """AC2: Pipeline should print and write a log file (even in test mode)."""
+        env = os.environ.copy()
+        env["PIPELINE_TEST_MODE"] = "1"
+
+        result = subprocess.run(
+            ["make", "pipeline"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=PIPELINE_TIMEOUT,
+            env=env,
+        )
+
+        output = result.stdout + result.stderr
+        assert result.returncode == 0
+
+        m = re.search(r"Log file:\s*(.+pipeline-\d{8}_\d{6}\.log)", output)
+        assert m, f"Output should print pipeline log file path\\nOutput: {output}"
+
+        log_path = Path(m.group(1)).expanduser()
+        assert log_path.exists(), f"Pipeline log file should exist: {log_path}"
+
+        # Cleanup (avoid polluting repo with test logs)
+        try:
+            log_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        latest = log_path.parent / "pipeline-latest.log"
+        if latest.is_symlink():
+            try:
+                latest.unlink()
+            except Exception:
+                pass
+
     def test_pipeline_prints_summary_section(self):
         """AC2/AC4: Output should include final summary section."""
         env = os.environ.copy()
@@ -133,6 +169,35 @@ class TestPipelineTestMode:
         # Should mention summary or recap
         assert "summary" in output.lower() or "complete" in output.lower() or "pipeline" in output.lower(), \
             f"Output should include summary section\nOutput: {output}"
+
+
+class TestPipelineFailureSimulation:
+    """AC3: Continue on failure and exit non-zero if any layer failed."""
+
+    def test_pipeline_continues_on_failure_and_exits_non_zero(self):
+        env = os.environ.copy()
+        env["PIPELINE_TEST_MODE"] = "1"
+        env["PIPELINE_SIMULATE_FAILURES"] = "precip,temp"
+
+        result = subprocess.run(
+            ["make", "pipeline"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=PIPELINE_TIMEOUT,
+            env=env,
+        )
+
+        output = result.stdout + result.stderr
+
+        assert result.returncode != 0, \
+            f"Pipeline should exit non-zero if any layer failed\\nOutput: {output}"
+
+        # Should still mention later layers (continue-on-failure)
+        assert "run_pipeline_humidity" in output, \
+            f"Pipeline should still attempt remaining layers\\nOutput: {output}"
+        assert "run_pipeline_uv" in output, \
+            f"Pipeline should still attempt remaining layers\\nOutput: {output}"
 
 
 class TestPipelineHelp:

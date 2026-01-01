@@ -6,22 +6,39 @@ Queensland Climate Information System Backend – FastAPI services for climate t
 
 ## ⚡ Quick Start (Recommended)
 
-**Launch all services with one command:**
+**From the repository root**, use the Makefile:
 
 ```bash
-cd CLISApp-backend
-./start.sh
-```
+# Start all services (API + Tile Server)
+make up
 
-Or run the Python script directly:
+# Or start services individually
+make api-up     # API service only
+make tiles-up   # Tile server only
 
-```bash
-python start_all_services.py
+# Check service status
+make status
+
+# View logs
+make logs
 ```
 
 This will start both:
 - 📡 Main API Service (port 8080) - `/api/v1/` routes
 - 🗺️ Tile Server (port 8000) - `/tiles/` tile service
+
+### Alternative: Backend-Local Scripts (Deprecated)
+
+The following backend-local scripts are **deprecated** and will be removed in Phase 2:
+
+```bash
+# DEPRECATED - Use 'make up' instead
+cd CLISApp-backend
+./start.sh                   # Delegates to Makefile
+python start_all_services.py # Shows deprecation warning
+```
+
+These scripts remain functional for backward compatibility but delegate to or warn about the Makefile.
 
 ---
 
@@ -61,7 +78,7 @@ CLISApp-backend/
 ├── data/                 # Downloads, intermediate data, generated tiles
 ├── data_pipeline/        # Tile generation pipeline & tile server
 │   └── servers/tile_server.py
-├── dev_server.py         # Convenience launcher for the API service
+├── dev_server.py         # DEPRECATED launcher for the API service (use Makefile)
 ├── requirements*.txt     # Dependency sets
 ├── scripts/              # Deployment and maintenance scripts
 ├── tests/                # Pytest suites
@@ -142,16 +159,17 @@ Data directories (`data/downloads`, `data/processing`, `data/tiles`) are created
 
 ### 5.1 Region API Service (FastAPI)
 
-`app/main.py` exposes the REST API. Use `dev_server.py` (hot-reload) or `uvicorn` directly.
+`app/main.py` exposes the REST API. **Recommended:** use `make api-up` from the repo root.
+Advanced (deprecated): direct runners below.
 
 ```bash
 # Activate venv first
 source venv/bin/activate
 
-# Option A: convenience script (reload enabled, reads settings)
+# Option A (DEPRECATED): convenience script (reload enabled, reads settings)
 python dev_server.py
 
-# Option B: manual uvicorn
+# Option B (advanced): manual uvicorn
 uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
 ```
 
@@ -162,7 +180,8 @@ Key endpoints once running at `http://localhost:8080`:
 
 ### 5.2 Tile Server
 
-`data_pipeline/servers/tile_server.py` serves tiles and demo pages.
+`data_pipeline/servers/tile_server.py` serves tiles and demo pages. **Recommended:** use `make tiles-up` from the repo root.
+Advanced (optional): run the tile server directly.
 
 ```bash
 source venv/bin/activate
@@ -171,7 +190,7 @@ python data_pipeline/servers/tile_server.py  # Defaults to host 0.0.0.0, port 80
 
 Useful endpoints at `http://localhost:8000`:
 - `GET /health` – health status & tile statistics
-- `GET /tiles/pm25/8/241/155.png` – sample tile
+- `GET /tiles/pm25/suburb/8/241/155.png` – sample tile
 - `GET /tiles/pm25/demo` – HTML preview
 
 > **Tip:** Run both services in separate terminals. The frontend expects the API on `:8080` and the tile server on `:8000` (adjust `src/constants/apiEndpoints.ts` if you prefer a different layout).
@@ -259,7 +278,7 @@ python -m data_pipeline.downloads.modis_lance.fetch_mod07 --stats
 
 | Symptom | Possible Cause | Fix |
 | --- | --- | --- |
-| `curl http://localhost:8080/api/v1/health` fails | API service not running / wrong port | Re-run `python dev_server.py`; confirm `.env` port |
+| `curl http://localhost:8080/api/v1/health` fails | API service not running / wrong port | Re-run `make api-up` (repo root); confirm `.env` port |
 | Tile requests return 404 | Tiles missing for requested layer/zoom | Verify `data/tiles/<layer>/<level>/<z>/<x>/<y>.png`; regenerate via API or pipeline |
 | Frontend 404 on `/api/v1/...` | Frontend `BASE_URL` still set to tile server port | Edit `src/constants/apiEndpoints.ts` (development should point to `http://localhost:8080`) |
 | Docker build fails on GDAL/Fiona | Using old base image | Ensure Dockerfile uses `python:3.11-slim-bookworm` |

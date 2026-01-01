@@ -24,7 +24,10 @@ from pathlib import Path
 TEST_MODE = os.environ.get("PIPELINE_TEST_MODE") == "1"
 STRICT_MODE = os.environ.get("PIPELINE_STRICT") == "1"
 
-# Prerequisite configurations per layer/stage
+from pipeline_locations import LAYER_ALIASES, normalize_layer
+
+
+# Prerequisite configurations per layer/stage (canonical layer keys)
 PREREQUISITES = {
     "pm25": {
         "download": {
@@ -73,7 +76,7 @@ PREREQUISITES = {
             "python_modules": ["PIL", "rasterio"],
         },
     },
-    "precip": {
+    "precipitation": {
         "download": {
             "credentials": [
                 {
@@ -101,7 +104,7 @@ PREREQUISITES = {
             "notes": ["Uses Open-Meteo API (no credentials required)"],
         },
         "process": {
-            "python_modules": ["requests", "xarray", "rasterio"],
+            "python_modules": ["httpx", "numpy", "rasterio"],
             "notes": ["Download and process are combined for Open-Meteo"],
         },
         "tiles": {
@@ -113,7 +116,7 @@ PREREQUISITES = {
             "notes": ["Uses Open-Meteo API (no credentials required)"],
         },
         "process": {
-            "python_modules": ["requests", "xarray", "rasterio"],
+            "python_modules": ["httpx", "numpy", "rasterio"],
             "notes": ["Download and process are combined for Open-Meteo"],
         },
         "tiles": {
@@ -173,6 +176,7 @@ def validate_prerequisites(layer, stage="full"):
     print("PIPELINE PREREQUISITE VALIDATION")
     print("=" * 70)
     print()
+    layer = normalize_layer(layer)
     print(f"Layer: {layer}")
     print(f"Stage: {stage}")
     print(f"Test Mode: {TEST_MODE}")
@@ -188,6 +192,9 @@ def validate_prerequisites(layer, stage="full"):
     if layer not in PREREQUISITES:
         print(f"  ✗ Unknown layer: {layer}")
         print(f"  ℹ️  Supported layers: {', '.join(PREREQUISITES.keys())}")
+        if LAYER_ALIASES:
+            aliases = ", ".join(f"{k}→{v}" for k, v in sorted(LAYER_ALIASES.items()))
+            print(f"  ℹ️  Aliases: {aliases}")
         return 1
 
     layer_prereqs = PREREQUISITES[layer]
@@ -268,7 +275,7 @@ def main():
     parser.add_argument(
         "--layer",
         required=True,
-        choices=list(PREREQUISITES.keys()),
+        choices=list(PREREQUISITES.keys()) + list(LAYER_ALIASES.keys()),
         help="Climate data layer",
     )
     parser.add_argument(

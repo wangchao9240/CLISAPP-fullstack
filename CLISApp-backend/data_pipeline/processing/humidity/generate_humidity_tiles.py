@@ -5,10 +5,27 @@ sys.path.append(str(Path(__file__).resolve().parents[3]))
 
 from data_pipeline.processing.common.generate_tiles import PM25TileGenerator
 
+def _resolve_humidity_tif() -> Path:
+    # Canonical Open-Meteo output location (written by process_openmeteo_humidity_to_tif.py)
+    latest = Path("data/processing/humidity/humidity_latest.tif")
+    if latest.exists():
+        return latest
+
+    candidates = sorted(
+        Path("data/processing/humidity").glob("humidity_openmeteo_*.tif"),
+        reverse=True,
+    )
+    if candidates:
+        return candidates[0]
+
+    raise SystemExit(
+        "GeoTIFF not found for humidity tiles.\n"
+        "Expected: data/processing/humidity/humidity_latest.tif\n"
+        "Action: run `python -m data_pipeline.processing.humidity.process_openmeteo_humidity_to_tif` first."
+    )
+
 def main():
-    tif_path = Path("data_pipeline/data/processed/cams/cams_rh_qld.tif")
-    if not tif_path.exists():
-        raise SystemExit(f"GeoTIFF not found: {tif_path}. Run process_humidity_from_cams.py first.")
+    tif_path = _resolve_humidity_tif()
 
     tiles_root = Path("tiles")
     layer = "humidity"
@@ -26,5 +43,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 

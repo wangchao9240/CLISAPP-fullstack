@@ -137,7 +137,7 @@ logs: ## View service logs
 # ==============================================================================
 
 .PHONY: pipeline
-pipeline: ## Run all layer pipelines (PM2.5, precipitation, temp, humidity, UV)
+pipeline: ## Run all layer pipelines (PM2.5, precipitation, temperature, humidity, UV)
 	@command -v python3 >/dev/null 2>&1 || { \
 		echo "  FAIL python3"; \
 		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
@@ -243,8 +243,40 @@ pipeline-uv: ## Run UV layer pipeline
 # ==============================================================================
 
 .PHONY: verify
-verify: ## Run verification/health checks
-	@echo "[verify] Not implemented yet - will run health checks"
+verify: ## Run aggregated verification (backend + pipeline + mobile instructions)
+	@command -v python3 >/dev/null 2>&1 || { \
+		echo "  FAIL python3"; \
+		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
+		exit 1; \
+	}
+	@python3 scripts/verify.py
+
+.PHONY: verify-backend
+verify-backend: ## Run backend verification (API + tile server health + sample tiles)
+	@command -v python3 >/dev/null 2>&1 || { \
+		echo "  FAIL python3"; \
+		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
+		exit 1; \
+	}
+	@python3 scripts/verify_backend.py
+
+.PHONY: verify-pipeline
+verify-pipeline: ## Run pipeline verification (end-to-end smoke test with fixtures)
+	@command -v python3 >/dev/null 2>&1 || { \
+		echo "  FAIL python3"; \
+		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
+		exit 1; \
+	}
+	@python3 scripts/verify_pipeline.py
+
+.PHONY: verify-mobile
+verify-mobile: ## Run mobile verification checklist (iOS/Android manual regression)
+	@command -v python3 >/dev/null 2>&1 || { \
+		echo "  FAIL python3"; \
+		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
+		exit 1; \
+	}
+	@python3 scripts/verify_mobile.py
 
 .PHONY: check-boundaries
 check-boundaries: ## Check architectural boundaries (app/ vs data_pipeline/ separation)

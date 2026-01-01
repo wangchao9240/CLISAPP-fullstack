@@ -52,6 +52,12 @@ class TestPipelinePrereqsTestMode:
         assert result.returncode == 0, \
             f"pipeline-{layer} should succeed in test mode\nOutput: {result.stdout + result.stderr}"
 
+        output = result.stdout + result.stderr
+        assert "PIPELINE PREREQUISITE VALIDATION" in output, \
+            f"pipeline-{layer} should run prerequisite validation\nOutput: {output}"
+        assert "[SKIP]" in output, \
+            f"pipeline-{layer} should list skipped checks in test mode\nOutput: {output}"
+
     def test_pipeline_full_exits_zero_in_test_mode(self):
         """AC4: Full pipeline should exit 0 in test mode."""
         env = os.environ.copy()
@@ -73,6 +79,12 @@ class TestPipelinePrereqsTestMode:
         # Should exit 0 in test mode
         assert result.returncode == 0, \
             f"pipeline should succeed in test mode\nOutput: {result.stdout + result.stderr}"
+
+        output = result.stdout + result.stderr
+        assert "PIPELINE PREREQUISITE VALIDATION" in output, \
+            f"pipeline should run prerequisite validation\nOutput: {output}"
+        assert "[SKIP]" in output, \
+            f"pipeline should list skipped checks in test mode\nOutput: {output}"
 
     @pytest.mark.parametrize("stage", ["download", "process", "tiles"])
     def test_pipeline_stages_exit_zero_in_test_mode(self, stage):
@@ -97,6 +109,12 @@ class TestPipelinePrereqsTestMode:
         assert result.returncode == 0, \
             f"pipeline-{stage} should succeed in test mode\nOutput: {result.stdout + result.stderr}"
 
+        output = result.stdout + result.stderr
+        assert "PIPELINE PREREQUISITE VALIDATION" in output, \
+            f"pipeline-{stage} should run prerequisite validation\nOutput: {output}"
+        assert "[SKIP]" in output or "Test mode enabled" in output, \
+            f"pipeline-{stage} should show test-mode skipped checks\nOutput: {output}"
+
     def test_test_mode_mentions_skipped_checks(self):
         """AC4: Test mode should mention that checks are skipped."""
         env = os.environ.copy()
@@ -113,9 +131,10 @@ class TestPipelinePrereqsTestMode:
 
         output = result.stdout + result.stderr
 
-        # Should mention test mode somewhere in output
-        assert "test" in output.lower() or "mode" in output.lower(), \
-            f"Output should mention test mode\nOutput: {output}"
+        assert "PIPELINE PREREQUISITE VALIDATION" in output, \
+            f"Output should include prerequisite validation header\nOutput: {output}"
+        assert "[SKIP]" in output, \
+            f"Output should list skipped checks in test mode\nOutput: {output}"
 
 
 class TestPipelinePrereqsRealMode:

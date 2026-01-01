@@ -55,9 +55,21 @@ CLISApp is a monorepo with two main parts:
 
 ### Runtime Topology (Local Dev)
 
-- **API service:** `http://localhost:8080` (routes under `/api/v1/*`, Swagger at `/docs` in debug)
-- **Tile service:** `http://localhost:8000` (routes under `/tiles/*` and `/health`)
+CLISApp uses a **two-service architecture** for clear separation of concerns:
+
+- **API service:** `http://localhost:8080`
+  - JSON endpoints: `/api/v1/*` (regions, health, tile metadata/status)
+  - Swagger documentation: `/docs` (debug mode only)
+
+- **Tile service:** `http://localhost:8000`
+  - Tile images: `/tiles/{layer}/{level}/{z}/{x}/{y}.png`
+  - Tile server health: `/health`
+
+**Note:** The legacy static tile mount on `:8080/tiles/*` is **disabled by default** in Phase 1 to avoid conflicting tile-serving surfaces. This will be completely removed in Phase 2.
+
+**Production:** Tile images are served by the dedicated tile service; set `TILE_SERVER_URL` in the mobile app config to the tiles domain.
 
 ### Containerization
 
 - Docker Compose defines services: `backend` (8080), `tile-server` (8000), `redis` (6379)
+- Both services use the same Docker image with different startup commands

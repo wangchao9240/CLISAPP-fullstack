@@ -35,16 +35,35 @@ const getLocalTileServerUrl = (): string => {
   // For physical device: 'http://192.168.0.97:8000/tiles';
 };
 
+const normalizeBaseUrl = (url: string): string => url.replace(/\/+$/, '');
+
+const resolveApiBaseUrl = (): string => {
+  const envBase = Config.API_BASE_URL?.trim();
+  if (envBase) {
+    return normalizeBaseUrl(envBase);
+  }
+  const fallback = isDevelopment ? getLocalBaseUrl() : 'https://clisapp-api.qut.edu.au';
+  return normalizeBaseUrl(fallback);
+};
+
+const resolveTileServerUrl = (): string => {
+  const envBase = Config.TILE_SERVER_URL?.trim();
+  if (envBase) {
+    return normalizeBaseUrl(envBase);
+  }
+  const fallback = isDevelopment
+    ? getLocalTileServerUrl()
+    : 'https://clisapp-tiles.qut.edu.au/tiles';
+  console.log('Using tile server URL:', normalizeBaseUrl(fallback));
+  return normalizeBaseUrl(fallback);
+};
+
 export const API_CONFIG = {
   // Backend base URL
-  BASE_URL: isDevelopment 
-    ? getLocalBaseUrl()
-    : 'https://clisapp-api.qut.edu.au',
+  BASE_URL: resolveApiBaseUrl(),
     
-  // Tile server configuration (using Phase 0 tile server)
-  TILE_SERVER_URL: isDevelopment 
-    ? getLocalTileServerUrl()
-    : 'https://clisapp-api.qut.edu.au/api/v1/tiles',
+  // Tile server configuration (canonical tile base for mobile)
+  TILE_SERVER_URL: resolveTileServerUrl(),
     
   // API timeouts
   TIMEOUT: isDevelopment ? 10000 : 15000,
@@ -60,17 +79,17 @@ export const API_CONFIG = {
 // Google Maps API key (loaded from .env file via react-native-config)
 export const GOOGLE_MAPS_API_KEY = Config.GOOGLE_MAPS_API_KEY || '';
 
-// Backend API endpoints (Phase 0 tile server)
+// Backend API endpoints (Phase 1 - aligned with canonical API)
 export const API_ENDPOINTS = {
-  // Health check (Phase 0 format)
-  HEALTH: '/health',
-  HEALTH_DETAILED: '/health', // Phase 0 only has basic health
-  
-  // Tile endpoints (Phase 0 format)
-  TILES: '/tiles',
-  TILE_STATUS: '/tiles/pm25/info', // Phase 0 tile info endpoint
-  
-  // Region endpoints (not available in Phase 0, for future use)
+  // Health check (Phase 1 canonical format)
+  HEALTH: '/api/v1/health', // Canonical health endpoint
+  HEALTH_DETAILED: '/api/v1/health/detailed', // Detailed health endpoint
+
+  // Tile endpoints (Phase 1 canonical format)
+  TILES: '/api/v1/tiles', // Canonical tile API base
+  TILE_STATUS: '/api/v1/tiles/status', // Canonical tile status endpoint
+
+  // Region endpoints
   REGIONS_SEARCH: '/api/v1/regions/search',
   REGIONS_INFO: '/api/v1/regions',
   REGIONS_CLIMATE: '/api/v1/regions/climate',

@@ -1,7 +1,15 @@
 #!/usr/bin/env python3
 """
-CLISApp Backend Development Server
-Quick startup script for local development
+CLISApp Backend Development Server (DEPRECATED)
+
+⚠️  DEPRECATED: This script is deprecated in Phase 1 and will be removed in Phase 2.
+
+Migration Path: Use the root Makefile instead
+  - For API service:   make api-up  (from repo root)
+  - For all services:  make up      (from repo root)
+
+This script remains functional for backward compatibility but is no longer
+the recommended entry point.
 """
 
 import uvicorn
@@ -15,6 +23,16 @@ sys.path.insert(0, str(app_dir))
 from app.core.config import settings
 
 if __name__ == "__main__":
+    # Display deprecation warning
+    print("=" * 70)
+    print("⚠️  DEPRECATION WARNING")
+    print("=" * 70)
+    print("\nThis script (dev_server.py) is DEPRECATED and will be removed in Phase 2.")
+    print("\n📌 Recommended: Use 'make api-up' from the repo root instead")
+    print("\nContinuing for backward compatibility...\n")
+    print("=" * 70)
+    print()
+
     print(f"🚀 Starting {settings.app_name} v{settings.app_version}")
     print(f"📍 Server: http://{settings.host}:{settings.port}")
     print(f"📚 API Docs: http://{settings.host}:{settings.port}/docs")

@@ -20,36 +20,50 @@ cp .env.example .env
 
 ## Run (Local)
 
-### Option A: start both services
+### Recommended: Use Makefile (from repo root)
 
 ```bash
-./start.sh
-# or
-python start_all_services.py
+# Start all services
+make up
+
+# Or start individually
+make api-up     # API service only
+make tiles-up   # Tile server only
+
+# Check status
+make status
+
+# View logs
+make logs
+
+# Stop services
+make down
 ```
 
 This starts:
 
-- API service on `:8080`
-- Tile server on `:8000`
+- API service on `:8080` - `/api/v1/*` endpoints
+- Tile server on `:8000` - `/tiles/*` tile images
 
-### Option B: run separately
+### Advanced: Direct uvicorn (optional)
+
+For advanced use cases, you can run uvicorn directly:
 
 API service:
 
 ```bash
-python dev_server.py
-# or
+cd CLISApp-backend
 uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
 ```
 
 Tile server:
 
 ```bash
-python data_pipeline/servers/tile_server.py
-# or
+cd CLISApp-backend
 uvicorn data_pipeline.servers.tile_server:app --host 0.0.0.0 --port 8000
 ```
+
+**Note:** The backend-local scripts (`start.sh`, `start_all_services.py`, `dev_server.py`) are deprecated and will be removed in Phase 2.
 
 ## Test
 

@@ -33,6 +33,23 @@ npm run ios
 npm run android
 ```
 
+## Backend (Required)
+
+From the repo root, start backend services via Makefile:
+
+```bash
+# Start API + tile server
+make up
+
+# Or start individually
+make api-up
+make tiles-up
+
+# Status / logs
+make status
+make logs
+```
+
 ## Backend Connectivity Notes
 
 - Android emulator must use `10.0.2.2` to reach the host machine.
