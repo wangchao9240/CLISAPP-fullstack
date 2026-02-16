@@ -1088,7 +1088,7 @@ DEPENDENCIES:
   - glog (from `../node_modules/react-native/third-party-podspecs/glog.podspec`)
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
   - libevent (~> 2.1.12)
-  - Permission-LocationWhenInUse (from `/Users/wang/Documents/qut/current_semester/IFN735_25se2_Industry_Project/CLISAPP/CLISApp-frontend/node_modules/react-native-permissions/ios/LocationWhenInUse`)
+  - Permission-LocationWhenInUse (from `/Users/wang/Documents/qut/current_semester/IFN736_25se2_Industry_Project/CLISAPP/CLISApp-frontend/node_modules/react-native-permissions/ios/LocationWhenInUse`)
   - RCT-Folly (from `../node_modules/react-native/third-party-podspecs/RCT-Folly.podspec`)
   - RCT-Folly/Fabric (from `../node_modules/react-native/third-party-podspecs/RCT-Folly.podspec`)
   - RCTRequired (from `../node_modules/react-native/Libraries/RCTRequired`)
@@ -1164,7 +1164,7 @@ EXTERNAL SOURCES:
     :podspec: "../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec"
     :tag: hermes-2024-04-29-RNv0.73.8-644c8be78af1eae7c138fa4093fb87f0f4f8db85
   Permission-LocationWhenInUse:
-    :path: "/Users/wang/Documents/qut/current_semester/IFN735_25se2_Industry_Project/CLISAPP/CLISApp-frontend/node_modules/react-native-permissions/ios/LocationWhenInUse"
+    :path: "/Users/wang/Documents/qut/current_semester/IFN736_25se2_Industry_Project/CLISAPP/CLISApp-frontend/node_modules/react-native-permissions/ios/LocationWhenInUse"
   RCT-Folly:
     :podspec: "../node_modules/react-native/third-party-podspecs/RCT-Folly.podspec"
   RCTRequired:

@@ -68,6 +68,7 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
   }, [openRegionInfo, setRegionInfoLoading, setRegionInfoError, setSelectedRegion]);
 
   const climateTileUrl = `${tileServerUrl}/${activeLayer}/{z}/{x}/{y}.png`;
+  const climateTileKey = `${activeLayer}-${mapLevel}-${tileServerUrl}`;
   
   // Get layer-specific opacity for smoother blending
   // Each climate layer has optimized opacity for best visualization
@@ -141,6 +142,7 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
           zIndex={1}
         />
         <UrlTile
+          key={climateTileKey}
           urlTemplate={climateTileUrl}
           maximumZ={TILE_CONFIG.maximumZ}
           minimumZ={TILE_CONFIG.minimumZ}

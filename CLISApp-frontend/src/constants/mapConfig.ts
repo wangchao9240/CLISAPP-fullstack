@@ -4,8 +4,9 @@ import { Region } from '../types/map.types';
 export const QUEENSLAND_REGION: Region = {
   latitude: -27.4698,
   longitude: 153.0251,
-  latitudeDelta: 10.0,
-  longitudeDelta: 10.0,
+  // Keep Queensland-wide context while staying above climate tile minimum zoom.
+  latitudeDelta: 5.0,
+  longitudeDelta: 5.0,
 };
 
 export const BRISBANE_REGION: Region = {

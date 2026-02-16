@@ -45,6 +45,8 @@ interface MapState {
   resetMapState: () => void;
 }
 
+const MAP_STORE_VERSION = 2;
+
 export const useMapStore = create<MapState>()(
   persist(
     (set, get) => ({
@@ -143,8 +145,18 @@ export const useMapStore = create<MapState>()(
     {
       name: 'clisapp-map',
       storage: createJSONStorage(() => AsyncStorage),
+      version: MAP_STORE_VERSION,
+      migrate: (persistedState: any, _version: number) => {
+        if (!persistedState) {
+          return persistedState;
+        }
+        // Ensure deterministic startup layer after config changes.
+        return {
+          ...persistedState,
+          activeLayer: DEFAULT_LAYER,
+        };
+      },
       partialize: (state) => ({
-        activeLayer: state.activeLayer,
         selectedRegionId: state.selectedRegionId,
       }),
     }
