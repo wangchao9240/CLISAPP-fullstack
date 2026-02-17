@@ -41,7 +41,7 @@ class OpenMeteoFetcher:
 
     # API endpoints
     WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
-    AIR_QUALITY_URL = "https://api.open-meteo.com/v1/air-quality"
+    AIR_QUALITY_URL = "https://air-quality-api.open-meteo.com/v1/air-quality"
 
     # Batch settings
     BATCH_SIZE = 100  # Number of coordinates per API call
