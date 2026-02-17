@@ -92,12 +92,26 @@ DEFAULT_LAYER_STYLES: Dict[str, Dict[str, List]] = {
 }
 
 class PM25TileGenerator:
-    def __init__(self, geotiff_file, output_dir="tiles", layer_name: str = "pm25", color_breaks=None, colors=None, zoom_levels=None, use_legacy_thresholds: bool = False, thresholds_override: Optional[List[float]] = None):
+    def __init__(
+        self,
+        geotiff_file,
+        output_dir="tiles",
+        layer_name: str = "pm25",
+        color_breaks=None,
+        colors=None,
+        zoom_levels=None,
+        use_legacy_thresholds: bool = False,
+        thresholds_override: Optional[List[float]] = None,
+        buffer_pixels: int = 4,
+        fill_passes: int = 3,
+    ):
         self.geotiff_file = geotiff_file
         self.output_dir = output_dir
         self.layer_name = layer_name
         self.tile_size = 256
         self.zoom_levels = zoom_levels or [6, 7, 8, 9, 10, 11, 12, 13]
+        self.buffer_pixels = max(0, int(buffer_pixels))
+        self.fill_passes = max(1, int(fill_passes))
         self.data_min: Optional[float] = None
         self.data_max: Optional[float] = None
         self.dynamic_thresholds: Optional[List[float]] = None
@@ -191,29 +205,31 @@ class PM25TileGenerator:
         return rgba_image
     
     def fill_missing_with_neighbor_mean(self, data: np.ndarray) -> np.ndarray:
-        """Fill 0 or NaN pixels using nearest neighbors (priority: up, down, left, right)"""
-        source = np.where(np.isnan(data), 0.0, data).astype(np.float32)
-        if not np.any(source == 0):
-            return source
+        """Fill 0 or NaN pixels using nearest neighbors (multiple passes)."""
+        filled = np.where(np.isnan(data), 0.0, data).astype(np.float32)
+        if not np.any(filled == 0):
+            return filled
 
-        filled = source.copy()
+        for _ in range(self.fill_passes):
+            if not np.any(filled == 0):
+                break
 
-        up = np.zeros_like(filled)
-        up[1:, :] = source[:-1, :]
+            up = np.zeros_like(filled)
+            up[1:, :] = filled[:-1, :]
 
-        down = np.zeros_like(filled)
-        down[:-1, :] = source[1:, :]
+            down = np.zeros_like(filled)
+            down[:-1, :] = filled[1:, :]
 
-        left = np.zeros_like(filled)
-        left[:, 1:] = source[:, :-1]
+            left = np.zeros_like(filled)
+            left[:, 1:] = filled[:, :-1]
 
-        right = np.zeros_like(filled)
-        right[:, :-1] = source[:, 1:]
+            right = np.zeros_like(filled)
+            right[:, :-1] = filled[:, 1:]
 
-        for neighbor in (up, down, left, right):
-            mask = (filled == 0) & (neighbor != 0)
-            if np.any(mask):
-                filled[mask] = neighbor[mask]
+            for neighbor in (up, down, left, right):
+                mask = (filled == 0) & (neighbor != 0)
+                if np.any(mask):
+                    filled[mask] = neighbor[mask]
 
         return filled
 
@@ -224,10 +240,24 @@ class PM25TileGenerator:
     def _extract_tile_data(self, src: rasterio.io.DatasetReader, zoom: int, x: int, y: int) -> Optional[np.ndarray]:
         lat_max, lon_min = self.num2deg(x, y, zoom)
         lat_min, lon_max = self.num2deg(x + 1, y + 1, zoom)
+        # Buffer-based extraction reduces edge seams by resampling with context.
+        if self.buffer_pixels > 0:
+            tile_lat_span = lat_max - lat_min
+            tile_lon_span = lon_max - lon_min
+            lat_buffer = (tile_lat_span / self.tile_size) * self.buffer_pixels
+            lon_buffer = (tile_lon_span / self.tile_size) * self.buffer_pixels
+        else:
+            lat_buffer = 0.0
+            lon_buffer = 0.0
+
+        buffered_lat_max = lat_max + lat_buffer
+        buffered_lat_min = lat_min - lat_buffer
+        buffered_lon_min = lon_min - lon_buffer
+        buffered_lon_max = lon_max + lon_buffer
 
         try:
             window = rasterio.windows.from_bounds(
-                lon_min, lat_min, lon_max, lat_max,
+                buffered_lon_min, buffered_lat_min, buffered_lon_max, buffered_lat_max,
                 src.transform
             )
         except Exception:
@@ -244,16 +274,17 @@ class PM25TileGenerator:
         if data.size == 0 or np.all(np.isnan(data)):
             return None
 
-        if data.shape != (256, 256):
+        target_size = self.tile_size + (self.buffer_pixels * 2)
+        if data.shape != (target_size, target_size):
             from rasterio.transform import from_bounds
             dst_transform = from_bounds(
-                lon_min, lat_min, lon_max, lat_max, 256, 256
+                buffered_lon_min, buffered_lat_min, buffered_lon_max, buffered_lat_max, target_size, target_size
             )
 
-            resampled = np.empty((256, 256), dtype=np.float32)
+            resampled = np.empty((target_size, target_size), dtype=np.float32)
             reproject(
                 data.reshape(1, *data.shape),
-                resampled.reshape(1, 256, 256),
+                resampled.reshape(1, target_size, target_size),
                 src_transform=rasterio.windows.transform(window, src.transform),
                 src_crs=src.crs,
                 dst_transform=dst_transform,
@@ -314,14 +345,23 @@ class PM25TileGenerator:
             if data is None:
                 return None
 
-            valid_mask = ~np.isnan(data)
-            valid_ratio = float(np.count_nonzero(valid_mask)) / data.size
+            if self.buffer_pixels > 0:
+                buffer = self.buffer_pixels
+                center_data = data[buffer:buffer + self.tile_size, buffer:buffer + self.tile_size]
+            else:
+                buffer = 0
+                center_data = data
+
+            valid_mask = ~np.isnan(center_data)
+            valid_ratio = float(np.count_nonzero(valid_mask)) / center_data.size
             if valid_ratio == 0.0 or valid_ratio < 0.02:
                 return None
 
             # Apply color mapping
             data = self.fill_missing_with_neighbor_mean(data)
             rgba_data = self.apply_pm25_colormap(data)
+            if buffer > 0:
+                rgba_data = rgba_data[buffer:buffer + self.tile_size, buffer:buffer + self.tile_size]
 
             if np.all(rgba_data[:, :, 3] == 0):  # fully transparent
                 return None
