@@ -13,15 +13,13 @@ Features:
 - Batch fetching for multiple coordinates
 - Automatic retry on failure (with exponential backoff for rate limits)
 - Redis caching
-- Support for both current and hourly forecast data
-- Integration with CAMS Global Model for PM2.5 (Plan B)
+- Support for weather + air quality endpoints
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-import json
 from datetime import datetime, timezone
 from typing import List, Dict, Optional, Any
 from pathlib import Path
@@ -103,7 +101,6 @@ class OpenMeteoFetcher:
             "latitude": lat_str,
             "longitude": lon_str,
             "current": "temperature_2m,relative_humidity_2m,precipitation,uv_index",
-            "hourly": "temperature_2m,relative_humidity_2m,precipitation,uv_index",
             "timezone": self.TIMEZONE,
             "forecast_days": 1  # Only get today's data
         }
@@ -111,6 +108,45 @@ class OpenMeteoFetcher:
         logger.debug(f"Fetching weather for {len(latitudes)} points")
 
         response = await self.session.get(self.WEATHER_URL, params=params)
+        response.raise_for_status()
+
+        return response.json()
+
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=2, min=4, max=70)
+    )
+    async def _fetch_air_quality_batch(
+        self,
+        latitudes: List[float],
+        longitudes: List[float]
+    ) -> Dict[str, Any]:
+        """
+        Fetch air quality data for a batch of coordinates.
+
+        Args:
+            latitudes: List of latitude values
+            longitudes: List of longitude values
+
+        Returns:
+            JSON response from Open-Meteo Air Quality API
+
+        Raises:
+            httpx.HTTPError: If the API request fails
+        """
+        lat_str = ",".join(str(lat) for lat in latitudes)
+        lon_str = ",".join(str(lon) for lon in longitudes)
+
+        params = {
+            "latitude": lat_str,
+            "longitude": lon_str,
+            "current": "pm2_5",
+            "timezone": self.TIMEZONE,
+        }
+
+        logger.debug(f"Fetching air quality for {len(latitudes)} points")
+
+        response = await self.session.get(self.AIR_QUALITY_URL, params=params)
         response.raise_for_status()
 
         return response.json()
@@ -127,20 +163,6 @@ class OpenMeteoFetcher:
         """
         logger.info(f"Fetching data for {len(grid_points)} grid points")
 
-        # Fetch PM2.5 data from CAMS Global Model
-        from data_pipeline.downloads.cams.fetch_pm25 import CamsPM25Fetcher
-        
-        pm25_values = []
-        try:
-            cams_fetcher = CamsPM25Fetcher()
-            logger.info("Fetching PM2.5 data from CAMS Global Model...")
-            # This might take a while if downloading new data
-            pm25_values = cams_fetcher.get_pm25_for_grid(grid_points)
-            logger.info(f"Mapped CAMS PM2.5 data for {len(pm25_values)} points")
-        except Exception as e:
-            logger.error(f"Failed to fetch CAMS PM2.5 data: {e}")
-            pm25_values = [None] * len(grid_points)
-
         all_data = {}
         total_batches = (len(grid_points) + self.BATCH_SIZE - 1) // self.BATCH_SIZE
 
@@ -149,9 +171,6 @@ class OpenMeteoFetcher:
             batch = grid_points[batch_idx:batch_idx + self.BATCH_SIZE]
             batch_num = batch_idx // self.BATCH_SIZE + 1
 
-            # Get corresponding PM2.5 values for this batch
-            batch_pm25 = pm25_values[batch_idx:batch_idx + self.BATCH_SIZE]
-
             logger.info(f"Processing batch {batch_num}/{total_batches} ({len(batch)} points)")
 
             try:
@@ -159,24 +178,34 @@ class OpenMeteoFetcher:
                 lats = [p["latitude"] for p in batch]
                 lons = [p["longitude"] for p in batch]
 
-                # Fetch weather only
-                weather_data = await self._fetch_weather_batch(lats, lons)
+                # Fetch weather + PM2.5 concurrently
+                weather_data, air_quality_data = await asyncio.gather(
+                    self._fetch_weather_batch(lats, lons),
+                    self._fetch_air_quality_batch(lats, lons),
+                )
 
                 # Parse and merge data
                 timestamp = datetime.now(timezone.utc).isoformat()
 
                 # Open-Meteo returns a list when querying multiple coordinates
-                if isinstance(weather_data, list):
+                if isinstance(weather_data, list) or isinstance(air_quality_data, list):
                     # Multiple locations as a list
                     for idx, point in enumerate(batch):
-                        if idx >= len(weather_data):
-                            continue
+                        if isinstance(weather_data, list):
+                            if idx >= len(weather_data):
+                                continue
+                            location_weather = weather_data[idx]
+                        else:
+                            location_weather = weather_data
+
+                        if isinstance(air_quality_data, list):
+                            if idx >= len(air_quality_data):
+                                continue
+                            location_air_quality = air_quality_data[idx]
+                        else:
+                            location_air_quality = air_quality_data
 
                         key = f"{point['latitude']}:{point['longitude']}"
-                        location_weather = weather_data[idx]
-                        
-                        # Get PM2.5 from our pre-fetched list
-                        pm25_val = batch_pm25[idx] if idx < len(batch_pm25) else None
 
                         all_data[key] = {
                             "latitude": point["latitude"],
@@ -185,15 +214,14 @@ class OpenMeteoFetcher:
                             "humidity": location_weather.get("current", {}).get("relative_humidity_2m"),
                             "precipitation": location_weather.get("current", {}).get("precipitation", 0.0),
                             "uv_index": location_weather.get("current", {}).get("uv_index", 0.0),
-                            "pm25": pm25_val,
+                            "pm25": location_air_quality.get("current", {}).get("pm2_5"),
                             "timestamp": timestamp,
-                            "source": "open-meteo+cams"
+                            "source": "open-meteo"
                         }
                 else:
                     # Single location
                     point = batch[0]
                     key = f"{point['latitude']}:{point['longitude']}"
-                    pm25_val = batch_pm25[0] if batch_pm25 else None
                     
                     all_data[key] = {
                         "latitude": point["latitude"],
@@ -202,13 +230,13 @@ class OpenMeteoFetcher:
                         "humidity": weather_data.get("current", {}).get("relative_humidity_2m"),
                         "precipitation": weather_data.get("current", {}).get("precipitation", 0.0),
                         "uv_index": weather_data.get("current", {}).get("uv_index", 0.0),
-                        "pm25": pm25_val,
+                        "pm25": air_quality_data.get("current", {}).get("pm2_5"),
                         "timestamp": timestamp,
-                        "source": "open-meteo+cams"
+                        "source": "open-meteo"
                     }
 
                 # Rate limiting - sleep longer to avoid minutely limit
-                await asyncio.sleep(2.0)
+                await asyncio.sleep(4.0)
 
             except Exception as e:
                 logger.error(f"Error processing batch {batch_num}: {e}", exc_info=True)
