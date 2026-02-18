@@ -38,6 +38,10 @@ const getLocalTileServerUrl = (): string => {
 const normalizeBaseUrl = (url: string): string => url.replace(/\/+$/, '');
 
 const resolveApiBaseUrl = (): string => {
+  const productionBase = Config.PRODUCTION_API_URL?.trim();
+  if (productionBase) {
+    return normalizeBaseUrl(productionBase);
+  }
   const envBase = Config.API_BASE_URL?.trim();
   if (envBase) {
     return normalizeBaseUrl(envBase);
@@ -47,6 +51,10 @@ const resolveApiBaseUrl = (): string => {
 };
 
 const resolveTileServerUrl = (): string => {
+  const productionBase = Config.PRODUCTION_TILE_URL?.trim();
+  if (productionBase) {
+    return normalizeBaseUrl(productionBase);
+  }
   const envBase = Config.TILE_SERVER_URL?.trim();
   if (envBase) {
     return normalizeBaseUrl(envBase);

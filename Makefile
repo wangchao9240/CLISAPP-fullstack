@@ -288,6 +288,22 @@ check-boundaries: ## Check architectural boundaries (app/ vs data_pipeline/ sepa
 	@python3 scripts/check_boundaries.py
 
 # ==============================================================================
+# MOBILE APP BUILD
+# ==============================================================================
+
+.PHONY: android-keystore
+android-keystore: ## Generate Android release keystore (run once before first build)
+	@bash CLISApp-frontend/scripts/generate-keystore.sh
+
+.PHONY: android-release
+android-release: ## Build Android release APK for distribution
+	@bash CLISApp-frontend/scripts/build-android-release.sh
+
+.PHONY: android-release-clean
+android-release-clean: ## Clean and build Android release APK
+	@bash CLISApp-frontend/scripts/build-android-release.sh --clean
+
+# ==============================================================================
 # ALIASES (for continuity with existing workflows)
 # ==============================================================================
 
