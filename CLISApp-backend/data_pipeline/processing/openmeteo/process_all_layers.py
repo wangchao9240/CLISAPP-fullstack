@@ -145,7 +145,7 @@ def _generate_tiles(layer: str, tif_path: Path) -> None:
     subprocess.run(cmd, check=True)
 
 
-async def process_all_layers() -> Dict[str, Path]:
+async def process_all_layers(skip_tiles: bool = False) -> Dict[str, Path]:
     """Fetch all layers from Open-Meteo and generate per-layer GeoTIFF + tiles."""
     logger.info("Fetching Open-Meteo climate data for %d grid points", len(GRID_POINTS))
 
@@ -164,7 +164,10 @@ async def process_all_layers() -> Dict[str, Path]:
         logger.info("%s coverage: %.1f%%", layer, coverage)
 
         tif_path = _write_geotiff(layer, array, timestamp)
-        _generate_tiles(layer, tif_path)
+        if not skip_tiles:
+            _generate_tiles(layer, tif_path)
+        else:
+            logger.info("Skipping tile generation (geotiff-only mode)")
         outputs[layer] = tif_path
 
     return outputs
@@ -177,7 +180,10 @@ def main() -> int:
     )
 
     try:
-        outputs = asyncio.run(process_all_layers())
+        import os
+
+        skip = os.environ.get("SKIP_TILES", "").strip().lower() in ("1", "true", "yes") or "--geotiff-only" in sys.argv
+        outputs = asyncio.run(process_all_layers(skip_tiles=skip))
         logger.info("Generated layers: %s", ", ".join(sorted(outputs.keys())))
         for layer, path in outputs.items():
             logger.info("%s GeoTIFF: %s", layer, path)
