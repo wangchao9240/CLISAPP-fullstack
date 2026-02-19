@@ -25,18 +25,18 @@ def normalize_layer(layer: str) -> str:
 
 LAYER_OUTPUTS: dict[str, dict[str, str]] = {
     "pm25": {
-        "raw_dir": "data_pipeline/data/raw/pm25",
-        "processed_dir": "data_pipeline/data/processed/pm25",
+        "raw_dir": "N/A (Open-Meteo API)",
+        "processed_dir": "data/processing/pm25",
         "tiles_dir": "tiles/pm25",
     },
     "precipitation": {
-        "raw_dir": "data_pipeline/data/raw/gpm/imerg_daily",
-        "processed_dir": "data_pipeline/data/processed/gpm",
+        "raw_dir": "N/A (Open-Meteo API)",
+        "processed_dir": "data/processing/precipitation",
         "tiles_dir": "tiles/precipitation",
     },
     "uv": {
-        "raw_dir": "data_pipeline/data/raw/cams/uv",
-        "processed_dir": "data_pipeline/data/processed/uv",
+        "raw_dir": "N/A (Open-Meteo API)",
+        "processed_dir": "data/processing/uv",
         "tiles_dir": "tiles/uv",
     },
     "temperature": {
@@ -54,4 +54,3 @@ LAYER_OUTPUTS: dict[str, dict[str, str]] = {
 
 def supported_layers() -> list[str]:
     return list(LAYER_OUTPUTS.keys())
-

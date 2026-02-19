@@ -33,50 +33,49 @@ class ClimateDataService:
 
     def __init__(self) -> None:
         base_path = (
-            Path(__file__).resolve().parents[2] / "data_pipeline" / "data" / "processed"
+            Path(__file__).resolve().parents[2] / "data" / "processing"
         )
 
         self._order: List[ClimateLayer] = list(CLIMATE_LAYER_CONFIGS.keys())
         self._layers: Dict[ClimateLayer, _LayerSettings] = {
             ClimateLayer.PM25: _LayerSettings(
                 layer=ClimateLayer.PM25,
-                path=base_path / "pm25" / "pm25_qld_cams_processed.tif",
+                path=base_path / "pm25" / "pm25_latest.tif",
                 unit="µg/m³",
-                data_source="Copernicus CAMS",
+                data_source="Open-Meteo",
                 precision=1,
                 min_value=0.0,
             ),
             ClimateLayer.PRECIPITATION: _LayerSettings(
                 layer=ClimateLayer.PRECIPITATION,
-                path=base_path / "gpm" / "imerg_daily_precip_qld.tif",
+                path=base_path / "precipitation" / "precipitation_latest.tif",
                 unit="mm/day",
-                data_source="NASA GPM IMERG",
+                data_source="Open-Meteo",
                 precision=1,
                 min_value=0.0,
             ),
             ClimateLayer.UV: _LayerSettings(
                 layer=ClimateLayer.UV,
-                path=base_path / "uv" / "cams_uv_qld.tif",
+                path=base_path / "uv" / "uv_latest.tif",
                 unit="UVI",
-                data_source="Copernicus CAMS",
+                data_source="Open-Meteo",
                 precision=1,
                 min_value=0.0,
-                transform="uv_to_index",
             ),
             ClimateLayer.HUMIDITY: _LayerSettings(
                 layer=ClimateLayer.HUMIDITY,
-                path=base_path / "cams" / "cams_rh_qld.tif",
+                path=base_path / "humidity" / "humidity_latest.tif",
                 unit="%",
-                data_source="Copernicus CAMS",
+                data_source="Open-Meteo",
                 precision=0,
                 min_value=0.0,
                 max_value=100.0,
             ),
             ClimateLayer.TEMPERATURE: _LayerSettings(
                 layer=ClimateLayer.TEMPERATURE,
-                path=base_path / "temp" / "cams_t2m_qld.tif",
+                path=base_path / "temp" / "temperature_latest.tif",
                 unit="°C",
-                data_source="Copernicus CAMS",
+                data_source="Open-Meteo",
                 precision=1,
             ),
         }

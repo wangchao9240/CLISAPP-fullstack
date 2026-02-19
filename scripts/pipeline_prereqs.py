@@ -31,23 +31,11 @@ from pipeline_locations import LAYER_ALIASES, normalize_layer
 PREREQUISITES = {
     "pm25": {
         "download": {
-            "credentials": [
-                {
-                    "name": "Copernicus CDS API",
-                    "check": lambda: Path.home() / ".cdsapirc",
-                    "required": True,
-                    "how_to_fix": [
-                        "1. Register at https://cds.climate.copernicus.eu/",
-                        "2. Create ~/.cdsapirc with your API key",
-                        "3. See CLISApp-backend/README.md for details",
-                    ],
-                },
-            ],
-            "python_modules": ["cdsapi"],
+            "notes": ["Uses Open-Meteo API (no credentials required)"],
         },
         "process": {
-            "python_modules": ["cfgrib", "xarray", "rasterio"],
-            "notes": ["Requires eccodes library (system dependency)"],
+            "python_modules": ["httpx", "numpy", "rasterio"],
+            "notes": ["Download and process are combined for Open-Meteo"],
         },
         "tiles": {
             "python_modules": ["PIL", "rasterio"],
@@ -55,22 +43,11 @@ PREREQUISITES = {
     },
     "uv": {
         "download": {
-            "credentials": [
-                {
-                    "name": "Copernicus CDS API",
-                    "check": lambda: Path.home() / ".cdsapirc",
-                    "required": True,
-                    "how_to_fix": [
-                        "1. Register at https://cds.climate.copernicus.eu/",
-                        "2. Create ~/.cdsapirc with your API key",
-                        "3. See CLISApp-backend/README.md for details",
-                    ],
-                },
-            ],
-            "python_modules": ["cdsapi"],
+            "notes": ["Uses Open-Meteo API (no credentials required)"],
         },
         "process": {
-            "python_modules": ["xarray", "rasterio"],
+            "python_modules": ["httpx", "numpy", "rasterio"],
+            "notes": ["Download and process are combined for Open-Meteo"],
         },
         "tiles": {
             "python_modules": ["PIL", "rasterio"],
@@ -78,22 +55,11 @@ PREREQUISITES = {
     },
     "precipitation": {
         "download": {
-            "credentials": [
-                {
-                    "name": "NASA Earthdata",
-                    "check": lambda: Path.home() / ".netrc",
-                    "required": False,  # May work without it in some cases
-                    "how_to_fix": [
-                        "1. Register at https://urs.earthdata.nasa.gov/",
-                        "2. Create ~/.netrc with credentials for urs.earthdata.nasa.gov",
-                        "3. See CLISApp-backend/README.md for details",
-                    ],
-                },
-            ],
-            "python_modules": ["requests"],
+            "notes": ["Uses Open-Meteo API (no credentials required)"],
         },
         "process": {
-            "python_modules": ["xarray", "rasterio"],
+            "python_modules": ["httpx", "numpy", "rasterio"],
+            "notes": ["Download and process are combined for Open-Meteo"],
         },
         "tiles": {
             "python_modules": ["PIL", "rasterio"],

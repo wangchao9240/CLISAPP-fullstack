@@ -5,7 +5,7 @@ apply plugin: "com.facebook.react"
 // Load environment variables from .env file
 project.ext.envConfigFiles = [
     debug: ".env",
-    release: ".env"
+    release: ".env.production"
 ]
 apply from: project(':react-native-config').projectDir.getPath() + "/dotenv.gradle"
 
@@ -99,6 +99,12 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            storeFile file(CLISAPP_RELEASE_STORE_FILE)
+            storePassword CLISAPP_RELEASE_STORE_PASSWORD
+            keyAlias CLISAPP_RELEASE_KEY_ALIAS
+            keyPassword CLISAPP_RELEASE_KEY_PASSWORD
+        }
     }
     buildTypes {
         debug {
@@ -107,7 +113,7 @@ android {
         release {
             // Caution! In production, you need to generate your own keystore file.
             // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }

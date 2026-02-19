@@ -40,13 +40,8 @@ LAYER_CONFIG = {
         "max_value": 50,
         "precision": 1,
         "color_breaks": [0, 10, 20, 30, 40],
-        # Updated to MODIS LANCE (near real-time satellite observations)
-        "data_source": "MODIS LANCE",
-        "source_products": "MOD07/MYD07",
-        "satellites": "Terra + Aqua",
-        "resolution_km": 5,
-        "latency_hours": "3-5",
-        "openmeteo_param": "temperature_2m"  # Legacy, kept for fallback
+        "data_source": "Open-Meteo",
+        "openmeteo_param": "temperature_2m",
     },
     "humidity": {
         "unit": "%",
@@ -54,14 +49,8 @@ LAYER_CONFIG = {
         "max_value": 100,
         "precision": 0,
         "color_breaks": [0, 30, 50, 70, 90],
-        # Updated to MODIS LANCE (total precipitable water vapor)
-        "data_source": "MODIS LANCE",
-        "source_products": "MOD07/MYD07",
-        "satellites": "Terra + Aqua",
-        "data_type": "total_column_water_vapor",
-        "resolution_km": 5,
-        "latency_hours": "3-5",
-        "openmeteo_param": "relative_humidity_2m"  # Legacy, kept for fallback
+        "data_source": "Open-Meteo",
+        "openmeteo_param": "relative_humidity_2m",
     },
     "precipitation": {
         "unit": "mm",
@@ -69,6 +58,7 @@ LAYER_CONFIG = {
         "max_value": 100,
         "precision": 1,
         "color_breaks": [0, 0.5, 2, 10, 50],
+        "data_source": "Open-Meteo",
         "openmeteo_param": "precipitation"
     },
     "uv_index": {
@@ -77,6 +67,7 @@ LAYER_CONFIG = {
         "max_value": 15,
         "precision": 1,
         "color_breaks": [0, 3, 6, 8, 11],
+        "data_source": "Open-Meteo",
         "openmeteo_param": "uv_index"
     },
     "pm25": {
@@ -85,22 +76,22 @@ LAYER_CONFIG = {
         "max_value": 500,
         "precision": 1,
         "color_breaks": [0, 12, 35, 55, 150],
+        "data_source": "Open-Meteo",
         "openmeteo_param": "pm2_5"
     }
 }
 
 # Update intervals (in minutes)
-# Temperature and humidity updated to 180 minutes (3 hours) to match MODIS data availability
 UPDATE_INTERVALS = {
-    "temperature": 180,  # Updated from 15 to 180 (MODIS LANCE ~3h latency)
-    "humidity": 180,     # Updated from 15 to 180 (MODIS LANCE ~3h latency)
-    "precipitation": 5,
-    "uv_index": 30,
-    "pm25": 10
+    "temperature": 60,
+    "humidity": 60,
+    "precipitation": 60,
+    "uv_index": 60,
+    "pm25": 60,
 }
 
 # Default update interval
-DEFAULT_UPDATE_INTERVAL = 10  # minutes
+DEFAULT_UPDATE_INTERVAL = 60  # minutes
 
 
 def generate_grid_points() -> List[Dict[str, float]]:
