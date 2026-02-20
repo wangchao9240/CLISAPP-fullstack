@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import warnings
 import json
+import tempfile
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -245,6 +246,65 @@ class PM25TileGenerator:
             if tile_span >= pixel_deg:
                 return zoom
         return 0
+
+    def _create_upsampled_tif(self, scale_factor: int = 8) -> Optional[str]:
+        """Pre-interpolate source TIF to reduce tile boundary banding.
+
+        Returns path to temp upsampled TIF, or None if upsampling not needed.
+        The caller is responsible for cleaning up the temp file.
+        """
+        with rasterio.open(self.geotiff_file) as src:
+            data = src.read(1)
+
+            if src.width >= 256 or src.height >= 256:
+                return None
+
+            new_width = src.width * scale_factor
+            new_height = src.height * scale_factor
+
+            dst_transform, dst_width, dst_height = calculate_default_transform(
+                src.crs, src.crs, new_width, new_height,
+                *src.bounds,
+            )
+
+            upsampled = np.empty((new_height, new_width), dtype=np.float32)
+            reproject(
+                data.reshape(1, *data.shape),
+                upsampled.reshape(1, new_height, new_width),
+                src_transform=src.transform,
+                src_crs=src.crs,
+                dst_transform=dst_transform,
+                dst_crs=src.crs,
+                resampling=Resampling.bilinear,
+                src_nodata=src.nodata,
+                dst_nodata=np.nan,
+            )
+
+            # Clamp to original data range to prevent interpolation overshoot
+            valid_mask = ~np.isnan(upsampled)
+            if self.data_min is not None and self.data_max is not None:
+                upsampled[valid_mask] = np.clip(
+                    upsampled[valid_mask], self.data_min, self.data_max
+                )
+
+            tmp_fd, tmp_path = tempfile.mkstemp(suffix=".tif")
+            os.close(tmp_fd)
+
+            with rasterio.open(
+                tmp_path, "w", driver="GTiff",
+                dtype=np.float32,
+                width=new_width, height=new_height,
+                count=1, crs=src.crs,
+                transform=dst_transform,
+                nodata=np.nan, compress="lzw",
+            ) as dst:
+                dst.write(upsampled.astype(np.float32), 1)
+
+            logger.info(
+                f"Upsampled TIF: {src.width}x{src.height} -> {new_width}x{new_height} "
+                f"(scale={scale_factor}x)"
+            )
+            return tmp_path
 
     def _upsample_zoom_level(self, zoom: int) -> int:
         """Generate tiles for zoom by splitting each parent tile (zoom-1)."""
@@ -517,6 +577,12 @@ class PM25TileGenerator:
                 f"Native max zoom: {self.native_max_zoom} (pixel res: {pixel_deg:.4f}deg)"
             )
 
+        # Pre-interpolate source to reduce tile boundary banding
+        upsampled_tif = self._create_upsampled_tif(scale_factor=8)
+        original_geotiff = self.geotiff_file
+        if upsampled_tif is not None:
+            self.geotiff_file = upsampled_tif
+
         self._maybe_prepare_dynamic_thresholds()
         
         total_generated = 0
@@ -533,6 +599,14 @@ class PM25TileGenerator:
         # Generate tile statistics
         self.generate_tile_stats()
         self._write_metadata()
+
+        # Restore original path and clean up temp file
+        if upsampled_tif is not None:
+            self.geotiff_file = original_geotiff
+            try:
+                os.remove(upsampled_tif)
+            except OSError:
+                pass
 
         return total_generated
     
