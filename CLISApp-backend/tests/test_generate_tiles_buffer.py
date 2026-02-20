@@ -2,6 +2,8 @@ import numpy as np
 import rasterio
 from rasterio.transform import from_bounds
 from rasterio.io import MemoryFile
+from PIL import Image
+from unittest.mock import MagicMock
 
 from data_pipeline.processing.common.generate_tiles import PM25TileGenerator
 
@@ -62,3 +64,69 @@ def test_extract_tile_data_handles_subpixel_window():
 
     assert data is not None
     assert data.shape == (256 + 2 * buffer_pixels, 256 + 2 * buffer_pixels)
+
+
+def test_compute_native_max_zoom():
+    generator = PM25TileGenerator("dummy.tif")
+    coarse_zoom = generator._compute_native_max_zoom(0.45)
+    fine_zoom = generator._compute_native_max_zoom(0.1)
+
+    assert coarse_zoom in {9, 10}
+    assert fine_zoom in {11, 12}
+
+
+def test_upsample_zoom_level(tmp_path):
+    output_dir = tmp_path / "tiles"
+    parent_dir = output_dir / "pm25" / "10" / "0"
+    parent_dir.mkdir(parents=True, exist_ok=True)
+    parent_tile = parent_dir / "0.png"
+    Image.new("RGBA", (256, 256), (255, 0, 0, 255)).save(parent_tile)
+
+    generator = PM25TileGenerator("dummy.tif", output_dir=output_dir, layer_name="pm25")
+    count = generator._upsample_zoom_level(11)
+
+    assert count == 4
+    child_dir = output_dir / "pm25" / "11"
+    expected_tiles = [
+        child_dir / "0" / "0.png",
+        child_dir / "1" / "0.png",
+        child_dir / "0" / "1.png",
+        child_dir / "1" / "1.png",
+    ]
+    for tile in expected_tiles:
+        assert tile.exists()
+        with Image.open(tile) as img:
+            assert img.size == (256, 256)
+
+
+def test_generate_all_tiles_uses_upsample_for_high_zoom(tmp_path):
+    tiff_path = tmp_path / "test.tif"
+    data = np.ones((10, 10), dtype=np.float32)
+    transform = from_bounds(0.0, 0.0, 1.0, 1.0, 10, 10)
+
+    with rasterio.open(
+        tiff_path,
+        "w",
+        driver="GTiff",
+        height=10,
+        width=10,
+        count=1,
+        dtype="float32",
+        crs="EPSG:4326",
+        transform=transform,
+    ) as dataset:
+        dataset.write(data, 1)
+
+    generator = PM25TileGenerator(
+        str(tiff_path),
+        output_dir=tmp_path / "tiles",
+        layer_name="pm25",
+        zoom_levels=[10, 11, 12],
+    )
+    generator.generate_tiles_for_zoom = MagicMock(return_value=1)
+    generator._upsample_zoom_level = MagicMock(return_value=1)
+
+    generator.generate_all_tiles()
+
+    assert generator.generate_tiles_for_zoom.call_args_list == [((10,),), ((11,),)]
+    generator._upsample_zoom_level.assert_called_once_with(12)
