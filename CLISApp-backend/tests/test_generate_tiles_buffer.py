@@ -6,9 +6,9 @@ from rasterio.io import MemoryFile
 from data_pipeline.processing.common.generate_tiles import PM25TileGenerator
 
 
-def _make_in_memory_dataset(width=10, height=10):
+def _make_in_memory_dataset(width=10, height=10, bounds=(-180.0, -85.0, 180.0, 85.0)):
     data = np.arange(width * height, dtype=np.float32).reshape((height, width))
-    transform = from_bounds(-180.0, -85.0, 180.0, 85.0, width, height)
+    transform = from_bounds(*bounds, width, height)
 
     memfile = MemoryFile()
     with memfile.open(
@@ -45,3 +45,20 @@ def test_fill_missing_with_neighbor_mean_multiple_passes():
     filled = generator.fill_missing_with_neighbor_mean(data)
 
     assert np.all(filled != 0.0)
+
+
+def test_extract_tile_data_handles_subpixel_window():
+    buffer_pixels = 4
+    generator = PM25TileGenerator("dummy.tif", buffer_pixels=buffer_pixels)
+
+    memfile = _make_in_memory_dataset(
+        width=37,
+        height=44,
+        bounds=(138.0, -29.0, 154.0, -10.0),
+    )
+    with memfile.open() as src:
+        x, y = generator.deg2num(-20.0, 146.0, 11)
+        data = generator._extract_tile_data(src, zoom=11, x=x, y=y)
+
+    assert data is not None
+    assert data.shape == (256 + 2 * buffer_pixels, 256 + 2 * buffer_pixels)

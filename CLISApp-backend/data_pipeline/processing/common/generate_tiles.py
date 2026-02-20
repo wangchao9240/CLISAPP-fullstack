@@ -265,6 +265,18 @@ class PM25TileGenerator:
 
         if window.width <= 0 or window.height <= 0:
             return None
+        if window.width < 1 or window.height < 1:
+            col_off = max(0, int(math.floor(window.col_off)))
+            row_off = max(0, int(math.floor(window.row_off)))
+            width = max(1, int(math.ceil(window.width)))
+            height = max(1, int(math.ceil(window.height)))
+            max_width = src.width - col_off
+            max_height = src.height - row_off
+            if max_width <= 0 or max_height <= 0:
+                return None
+            width = min(width, max_width)
+            height = min(height, max_height)
+            window = Window(col_off, row_off, width, height)
 
         try:
             data = src.read(1, window=window)
