@@ -30,7 +30,7 @@ def main():
     tiles_root = Path("tiles")
     layer = "humidity"
 
-    generator = PM25TileGenerator(str(tif_path), layer_name=layer, zoom_levels=[6, 7, 8, 9, 10, 11, 12, 13])
+    generator = PM25TileGenerator(str(tif_path), layer_name=layer, zoom_levels=[6, 7, 8, 9, 10, 11])
     total_tiles = generator.generate_all_tiles()
 
     layer_dir = tiles_root / layer
@@ -39,7 +39,7 @@ def main():
         cmd = [sys.executable, str(Path(__file__).resolve().parents[1] / "common" / "upsample_zoom11_to_12.py"), "--tiles-root", str(tiles_root), "--min-zoom", "11", "--max-zoom", "13", layer]
         run(cmd, check=False)
 
-    print(f"Humidity tiles generated (target zoom 6-13): {total_tiles}")
+    print(f"Humidity tiles generated (target zoom 6-11): {total_tiles}")
 
 if __name__ == "__main__":
     main()

@@ -110,7 +110,7 @@ class PM25TileGenerator:
         self.output_dir = output_dir
         self.layer_name = layer_name
         self.tile_size = 256
-        self.zoom_levels = zoom_levels or [6, 7, 8, 9, 10, 11, 12, 13]
+        self.zoom_levels = zoom_levels or [6, 7, 8, 9, 10, 11]
         self.buffer_pixels = max(0, int(buffer_pixels))
         self.fill_passes = max(1, int(fill_passes))
         self.data_min: Optional[float] = None
@@ -720,7 +720,7 @@ def main():
         generator = PM25TileGenerator(
             str(geotiff_file),
             layer_name=layer,
-            zoom_levels=zooms or [6, 7, 8, 9, 10, 11, 12, 13],
+            zoom_levels=zooms or [6, 7, 8, 9, 10, 11],
             use_legacy_thresholds=legacy_thresholds,
             thresholds_override=thresholds_override,
         )

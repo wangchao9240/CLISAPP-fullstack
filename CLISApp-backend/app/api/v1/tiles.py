@@ -32,7 +32,7 @@ async def get_tile(
     Args:
         layer: Climate data layer (pm25, precipitation, uv, humidity, temperature)
         level: Geographic level (lga or suburb)
-        z: Zoom level (6-12)
+        z: Zoom level (6-11)
         x: Tile X coordinate
         y: Tile Y coordinate
         format: Image format (png, jpg, webp)

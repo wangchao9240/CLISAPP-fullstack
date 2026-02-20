@@ -81,7 +81,7 @@ async def run_pipeline():
                 str(tif_path),
                 output_dir=str(output_tiles_dir),
                 layer_name=layer_name,
-                zoom_levels=[6, 7, 8, 9, 10, 11, 12] # Adjust zooms as needed
+                zoom_levels=[6, 7, 8, 9, 10, 11]
             )
             generator.generate_all_tiles()
         except Exception as e:

@@ -14,10 +14,10 @@ LAYERS = [
 
 for layer, tif in LAYERS:
     print(f"\n{'='*60}")
-    print(f"Generating {layer} tiles (zoom 6-12)")
+    print(f"Generating {layer} tiles (zoom 6-11)")
     print(f"{'='*60}")
     start = time.time()
-    gen = PM25TileGenerator(tif, output_dir="tiles", layer_name=layer, zoom_levels=[6, 7, 8, 9, 10, 11, 12])
+    gen = PM25TileGenerator(tif, output_dir="tiles", layer_name=layer, zoom_levels=[6, 7, 8, 9, 10, 11])
     total = gen.generate_all_tiles()
     elapsed = time.time() - start
     print(f"RESULT: {layer} | {total} tiles | {elapsed:.1f}s | native_max_zoom={gen.native_max_zoom}")

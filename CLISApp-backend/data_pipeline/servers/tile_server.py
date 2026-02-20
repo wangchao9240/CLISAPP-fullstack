@@ -119,7 +119,7 @@ async def health_check(include_stats: bool = False, max_files: int = 2000):
         "stats_truncated": stats_truncated,
         "stats_max_files": max_files if include_stats else None,
         "tile_format": "PNG with transparency",
-        "supported_zoom_levels": "6-13"
+        "supported_zoom_levels": "6-11"
     }
 
 def build_tile_response(tile_path: Path, layer: str, z: int, x: int, y: int):
@@ -291,7 +291,7 @@ async def get_pm25_info():
         "temporal_resolution": "Mean of 3-hourly forecast steps",
         "data_bounds": data_bounds,
         "zoom_levels": {
-            "supported": "6-13",
+            "supported": "6-11",
             "available": list(tiles_by_zoom.keys()),
             "recommended": "8-10 for best performance"
         },
@@ -365,7 +365,7 @@ async def get_precipitation_info():
         "spatial_resolution": "0.1 degrees (~10km)",
         "data_bounds": data_bounds,
         "zoom_levels": {
-            "supported": "6-13",
+            "supported": "6-11",
             "available": list(tiles_by_zoom.keys()),
             "recommended": "8-11 for best performance"
         },
@@ -427,7 +427,7 @@ async def get_precipitation_info():
         "temporal_resolution": "Mean of 3-hourly forecast steps",
         "data_bounds": data_bounds,
         "zoom_levels": {
-            "supported": "6-13",
+            "supported": "6-11",
             "available": list(tiles_by_zoom.keys()),
             "recommended": "8-10 for best performance"
         },
