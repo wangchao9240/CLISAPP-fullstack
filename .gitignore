@@ -16,6 +16,7 @@
 *~
 .claude/
 .codex/
+.worktrees/
 
 # ===================================
 # Python / Backend

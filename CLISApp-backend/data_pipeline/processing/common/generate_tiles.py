@@ -117,6 +117,7 @@ class PM25TileGenerator:
         self.dynamic_thresholds: Optional[List[float]] = None
         self.use_legacy_thresholds = use_legacy_thresholds
         self.thresholds_override = thresholds_override
+        self.native_max_zoom: Optional[int] = None
         
         # Default PM2.5 color mapping (based on WHO guidance)
         layer_style = DEFAULT_LAYER_STYLES.get(layer_name, {})
@@ -237,6 +238,61 @@ class PM25TileGenerator:
         limit = 2 ** zoom
         return 0 <= x < limit and 0 <= y < limit
 
+    def _compute_native_max_zoom(self, pixel_deg: float) -> int:
+        """Return the highest zoom where a single tile spans >= pixel_deg."""
+        for zoom in range(20, -1, -1):
+            tile_span = 360.0 / (2 ** zoom)
+            if tile_span >= pixel_deg:
+                return zoom
+        return 0
+
+    def _upsample_zoom_level(self, zoom: int) -> int:
+        """Generate tiles for zoom by splitting each parent tile (zoom-1)."""
+        parent_zoom = zoom - 1
+        parent_dir = Path(self.output_dir) / self.layer_name / str(parent_zoom)
+        if not parent_dir.exists():
+            logger.warning(
+                f"Parent zoom {parent_zoom} directory missing, cannot upsample to {zoom}"
+            )
+            return 0
+        logger.info(f"Upsampling zoom {parent_zoom} -> {zoom} (tile pyramid)")
+        count = 0
+        for x_dir in parent_dir.iterdir():
+            if not x_dir.is_dir() or not x_dir.name.isdigit():
+                continue
+            px = int(x_dir.name)
+            for y_file in x_dir.glob("*.png"):
+                if not y_file.stem.isdigit():
+                    continue
+                py = int(y_file.stem)
+                try:
+                    with Image.open(y_file) as img:
+                        w, h = img.size
+                        hw, hh = w // 2, h // 2
+                        quadrants = [
+                            (0, 0, hw, hh, 0, 0),
+                            (hw, 0, w, hh, 1, 0),
+                            (0, hh, hw, h, 0, 1),
+                            (hw, hh, w, h, 1, 1),
+                        ]
+                        for x1, y1, x2, y2, dx, dy in quadrants:
+                            child = img.crop((x1, y1, x2, y2))
+                            child = child.resize((w, h), Image.BILINEAR)
+                            cx, cy = px * 2 + dx, py * 2 + dy
+                            out_dir = (
+                                Path(self.output_dir)
+                                / self.layer_name
+                                / str(zoom)
+                                / str(cx)
+                            )
+                            out_dir.mkdir(parents=True, exist_ok=True)
+                            child.save(out_dir / f"{cy}.png", "PNG")
+                            count += 1
+                except Exception:
+                    continue
+        logger.info(f"Zoom {zoom} upsample complete: {count} tiles created")
+        return count
+
     def _extract_tile_data(self, src: rasterio.io.DatasetReader, zoom: int, x: int, y: int) -> Optional[np.ndarray]:
         lat_max, lon_min = self.num2deg(x, y, zoom)
         lat_min, lon_max = self.num2deg(x + 1, y + 1, zoom)
@@ -265,6 +321,18 @@ class PM25TileGenerator:
 
         if window.width <= 0 or window.height <= 0:
             return None
+        if window.width < 1 or window.height < 1:
+            col_off = max(0, int(math.floor(window.col_off)))
+            row_off = max(0, int(math.floor(window.row_off)))
+            width = max(1, int(math.ceil(window.width)))
+            height = max(1, int(math.ceil(window.height)))
+            max_width = src.width - col_off
+            max_height = src.height - row_off
+            if max_width <= 0 or max_height <= 0:
+                return None
+            width = min(width, max_width)
+            height = min(height, max_height)
+            window = Window(col_off, row_off, width, height)
 
         try:
             data = src.read(1, window=window)
@@ -443,13 +511,21 @@ class PM25TileGenerator:
             self.data_min = float(np.nanmin(data_range))
             self.data_max = float(np.nanmax(data_range))
             logger.info(f"Data range: {self.data_min:.2f} - {self.data_max:.2f}")
+            pixel_deg = abs(src.transform.a)
+            self.native_max_zoom = self._compute_native_max_zoom(pixel_deg)
+            logger.info(
+                f"Native max zoom: {self.native_max_zoom} (pixel res: {pixel_deg:.4f}deg)"
+            )
 
         self._maybe_prepare_dynamic_thresholds()
         
         total_generated = 0
         
         for zoom in self.zoom_levels:
-            generated = self.generate_tiles_for_zoom(zoom)
+            if self.native_max_zoom is not None and zoom > self.native_max_zoom:
+                generated = self._upsample_zoom_level(zoom)
+            else:
+                generated = self.generate_tiles_for_zoom(zoom)
             total_generated += generated
         
         logger.info(f"Tile generation complete! Total tiles generated: {total_generated}")

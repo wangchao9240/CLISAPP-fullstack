@@ -92,6 +92,35 @@ For more details, see:
 **Data Pipeline:**
 - Pipeline scripts: `CLISApp-backend/data_pipeline/pipeline_scripts/` - One-click scripts per layer
 
+## Climate Data Sources & Paths
+
+**Production climate sampling path:**
+
+```
+CLISApp-backend/data/processing/<layer>/<layer>_latest.tif
+```
+
+Layers: `pm25`, `precipitation`, `uv`, `humidity`, `temperature`.
+
+**Data source:** Open-Meteo (raw values; no UV transform applied).
+
+**Legacy path note:** `data_pipeline/data/processed/` is not used by the API for climate sampling.
+
+## API Behavior Notes
+
+- `GET /api/v1/regions/by-coordinates` returns `current_climate` when the latest rasters exist.
+- `data_sources` includes `Open-Meteo` for climate fields.
+
+## Open-Meteo Pipeline Flags
+
+To generate GeoTIFFs without tiles:
+
+```bash
+SKIP_TILES=1 python -m data_pipeline.processing.openmeteo.process_all_layers
+# or
+python -m data_pipeline.processing.openmeteo.process_all_layers --geotiff-only
+```
+
 ## Platform-Specific Connectivity
 
 When connecting the mobile app to backend services during development:
@@ -105,6 +134,9 @@ Use `localhost`:
 Use `10.0.2.2` (special Android emulator IP that maps to host machine's localhost):
 - API: `http://10.0.2.2:8080`
 - Tiles: `http://10.0.2.2:8000/tiles`
+
+### iOS Production HTTP Access
+The iOS app allows HTTP access to the production API host via `Info.plist` so the simulator/device can reach `http://136.114.38.138:8080`.
 
 ## Verification Evidence
 
