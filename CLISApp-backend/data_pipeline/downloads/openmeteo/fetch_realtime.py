@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
 from datetime import datetime, timezone
 from typing import List, Dict, Optional, Any
 from pathlib import Path
@@ -31,7 +32,13 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 import httpx
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+    before_sleep_log,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +51,12 @@ class OpenMeteoFetcher:
     AIR_QUALITY_URL = "https://air-quality-api.open-meteo.com/v1/air-quality"
 
     # Batch settings
-    BATCH_SIZE = 100  # Number of coordinates per API call
+    BATCH_SIZE = 300  # Number of coordinates per API call
     MAX_CONCURRENT_REQUESTS = 5  # Concurrent API calls
     REQUEST_TIMEOUT = 30  # Seconds
+    BASE_DELAY = 3.0
+    MAX_DELAY = 30.0
+    JITTER_FACTOR = 0.2
 
     # Timezone for Queensland
     TIMEZONE = "Australia/Brisbane"
@@ -73,7 +83,9 @@ class OpenMeteoFetcher:
 
     @retry(
         stop=stop_after_attempt(5),
-        wait=wait_exponential(multiplier=2, min=4, max=70)
+        wait=wait_exponential(multiplier=2, min=8, max=60),
+        retry=retry_if_exception_type((httpx.HTTPStatusError,)),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
     )
     async def _fetch_weather_batch(
         self,
@@ -108,13 +120,19 @@ class OpenMeteoFetcher:
         logger.debug(f"Fetching weather for {len(latitudes)} points")
 
         response = await self.session.get(self.WEATHER_URL, params=params)
-        response.raise_for_status()
+        if response.status_code == 429 or response.status_code >= 500:
+            response.raise_for_status()
+        elif response.status_code >= 400:
+            logger.error(f"Non-retryable error {response.status_code}: {response.text[:200]}")
+            return None
 
         return response.json()
 
     @retry(
         stop=stop_after_attempt(5),
-        wait=wait_exponential(multiplier=2, min=4, max=70)
+        wait=wait_exponential(multiplier=2, min=8, max=60),
+        retry=retry_if_exception_type((httpx.HTTPStatusError,)),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
     )
     async def _fetch_air_quality_batch(
         self,
@@ -147,9 +165,99 @@ class OpenMeteoFetcher:
         logger.debug(f"Fetching air quality for {len(latitudes)} points")
 
         response = await self.session.get(self.AIR_QUALITY_URL, params=params)
-        response.raise_for_status()
+        if response.status_code == 429 or response.status_code >= 500:
+            response.raise_for_status()
+        elif response.status_code >= 400:
+            logger.error(f"Non-retryable error {response.status_code}: {response.text[:200]}")
+            return None
 
         return response.json()
+
+    async def _process_batch(
+        self,
+        batch: List[Dict[str, float]],
+        all_data: Dict[str, Dict],
+        error_counts: Dict[str, int],
+    ) -> bool:
+        """Process a single batch: fetch weather then air quality sequentially."""
+        try:
+            lats = [p["latitude"] for p in batch]
+            lons = [p["longitude"] for p in batch]
+
+            # Sequential requests to avoid burst (not parallel gather)
+            weather_data = await self._fetch_weather_batch(lats, lons)
+            await asyncio.sleep(0.5)  # Brief pause between endpoints
+            air_quality_data = await self._fetch_air_quality_batch(lats, lons)
+
+            if weather_data is None or air_quality_data is None:
+                error_counts["other"] += 1
+                return False
+
+            timestamp = datetime.now(timezone.utc).isoformat()
+
+            if isinstance(weather_data, list) or isinstance(air_quality_data, list):
+                for idx, point in enumerate(batch):
+                    if isinstance(weather_data, list):
+                        if idx >= len(weather_data):
+                            continue
+                        location_weather = weather_data[idx]
+                    else:
+                        location_weather = weather_data
+
+                    if isinstance(air_quality_data, list):
+                        if idx >= len(air_quality_data):
+                            continue
+                        location_air_quality = air_quality_data[idx]
+                    else:
+                        location_air_quality = air_quality_data
+
+                    key = f"{point['latitude']}:{point['longitude']}"
+                    all_data[key] = {
+                        "latitude": point["latitude"],
+                        "longitude": point["longitude"],
+                        "temperature": location_weather.get("current", {}).get("temperature_2m"),
+                        "humidity": location_weather.get("current", {}).get("relative_humidity_2m"),
+                        "precipitation": location_weather.get("current", {}).get("precipitation", 0.0),
+                        "uv_index": location_weather.get("current", {}).get("uv_index", 0.0),
+                        "pm25": location_air_quality.get("current", {}).get("pm2_5"),
+                        "timestamp": timestamp,
+                        "source": "open-meteo",
+                    }
+            else:
+                point = batch[0]
+                key = f"{point['latitude']}:{point['longitude']}"
+                all_data[key] = {
+                    "latitude": point["latitude"],
+                    "longitude": point["longitude"],
+                    "temperature": weather_data.get("current", {}).get("temperature_2m"),
+                    "humidity": weather_data.get("current", {}).get("relative_humidity_2m"),
+                    "precipitation": weather_data.get("current", {}).get("precipitation", 0.0),
+                    "uv_index": weather_data.get("current", {}).get("uv_index", 0.0),
+                    "pm25": air_quality_data.get("current", {}).get("pm2_5"),
+                    "timestamp": timestamp,
+                    "source": "open-meteo",
+                }
+            return True
+
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 429:
+                error_counts["429"] += 1
+                logger.warning("Rate limited (429) on batch")
+            elif e.response.status_code >= 500:
+                error_counts["5xx"] += 1
+                logger.warning(f"Server error ({e.response.status_code}) on batch")
+            else:
+                error_counts["other"] += 1
+                logger.error(f"HTTP error ({e.response.status_code}) on batch")
+            return False
+        except httpx.TimeoutException:
+            error_counts["timeout"] += 1
+            logger.warning("Timeout on batch")
+            return False
+        except Exception as e:
+            error_counts["other"] += 1
+            logger.error(f"Unexpected error on batch: {e}", exc_info=True)
+            return False
 
     async def fetch_all_data(self, grid_points: List[Dict[str, float]]) -> Dict[str, Dict]:
         """
@@ -164,85 +272,43 @@ class OpenMeteoFetcher:
         logger.info(f"Fetching data for {len(grid_points)} grid points")
 
         all_data = {}
+        failed_batches = []
+        error_counts = {"429": 0, "5xx": 0, "other": 0, "timeout": 0}
+        current_delay = self.BASE_DELAY
         total_batches = (len(grid_points) + self.BATCH_SIZE - 1) // self.BATCH_SIZE
 
-        # Process in batches
         for batch_idx in range(0, len(grid_points), self.BATCH_SIZE):
             batch = grid_points[batch_idx:batch_idx + self.BATCH_SIZE]
             batch_num = batch_idx // self.BATCH_SIZE + 1
 
             logger.info(f"Processing batch {batch_num}/{total_batches} ({len(batch)} points)")
 
-            try:
-                # Extract coordinates
-                lats = [p["latitude"] for p in batch]
-                lons = [p["longitude"] for p in batch]
+            success = await self._process_batch(batch, all_data, error_counts)
+            if not success:
+                failed_batches.append(batch)
 
-                # Fetch weather + PM2.5 concurrently
-                weather_data, air_quality_data = await asyncio.gather(
-                    self._fetch_weather_batch(lats, lons),
-                    self._fetch_air_quality_batch(lats, lons),
-                )
+            # Adaptive delay with jitter
+            jitter = current_delay * self.JITTER_FACTOR * (2 * random.random() - 1)
+            await asyncio.sleep(current_delay + jitter)
 
-                # Parse and merge data
-                timestamp = datetime.now(timezone.utc).isoformat()
+            # Adjust delay based on errors
+            if error_counts["429"] > 0:
+                current_delay = min(current_delay * 2, self.MAX_DELAY)
+                error_counts["429"] = 0  # Reset after adjusting
+            else:
+                current_delay = max(current_delay * 0.9, self.BASE_DELAY)
 
-                # Open-Meteo returns a list when querying multiple coordinates
-                if isinstance(weather_data, list) or isinstance(air_quality_data, list):
-                    # Multiple locations as a list
-                    for idx, point in enumerate(batch):
-                        if isinstance(weather_data, list):
-                            if idx >= len(weather_data):
-                                continue
-                            location_weather = weather_data[idx]
-                        else:
-                            location_weather = weather_data
+        # Retry failed batches after cooldown
+        if failed_batches:
+            logger.warning(f"Retrying {len(failed_batches)} failed batches after 30s cooldown")
+            await asyncio.sleep(30.0)
+            for i, batch in enumerate(failed_batches):
+                logger.info(f"Retry batch {i+1}/{len(failed_batches)}")
+                await self._process_batch(batch, all_data, error_counts)
+                await asyncio.sleep(self.BASE_DELAY)
 
-                        if isinstance(air_quality_data, list):
-                            if idx >= len(air_quality_data):
-                                continue
-                            location_air_quality = air_quality_data[idx]
-                        else:
-                            location_air_quality = air_quality_data
-
-                        key = f"{point['latitude']}:{point['longitude']}"
-
-                        all_data[key] = {
-                            "latitude": point["latitude"],
-                            "longitude": point["longitude"],
-                            "temperature": location_weather.get("current", {}).get("temperature_2m"),
-                            "humidity": location_weather.get("current", {}).get("relative_humidity_2m"),
-                            "precipitation": location_weather.get("current", {}).get("precipitation", 0.0),
-                            "uv_index": location_weather.get("current", {}).get("uv_index", 0.0),
-                            "pm25": location_air_quality.get("current", {}).get("pm2_5"),
-                            "timestamp": timestamp,
-                            "source": "open-meteo"
-                        }
-                else:
-                    # Single location
-                    point = batch[0]
-                    key = f"{point['latitude']}:{point['longitude']}"
-                    
-                    all_data[key] = {
-                        "latitude": point["latitude"],
-                        "longitude": point["longitude"],
-                        "temperature": weather_data.get("current", {}).get("temperature_2m"),
-                        "humidity": weather_data.get("current", {}).get("relative_humidity_2m"),
-                        "precipitation": weather_data.get("current", {}).get("precipitation", 0.0),
-                        "uv_index": weather_data.get("current", {}).get("uv_index", 0.0),
-                        "pm25": air_quality_data.get("current", {}).get("pm2_5"),
-                        "timestamp": timestamp,
-                        "source": "open-meteo"
-                    }
-
-                # Rate limiting - sleep longer to avoid minutely limit
-                await asyncio.sleep(4.0)
-
-            except Exception as e:
-                logger.error(f"Error processing batch {batch_num}: {e}", exc_info=True)
-                continue
-
-        logger.info(f"Successfully fetched data for {len(all_data)} points")
+        logger.info(f"Successfully fetched data for {len(all_data)}/{len(grid_points)} points")
+        logger.info(f"Error summary: {error_counts}")
         return all_data
 
     async def fetch_and_cache(
