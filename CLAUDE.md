@@ -27,6 +27,21 @@ make api-up        # Start API service only (port 8080)
 make api-down      # Stop API service
 make tiles-up      # Start tile server only (port 8000)
 make tiles-down    # Stop tile server
+
+# Data pipeline
+make pipeline      # Run full pipeline (all 5 layers, single run)
+make update-data   # Fetch latest data only (no tile generation)
+make pipeline-pm25 # Run PM2.5 layer only
+make pipeline-precip # Run precipitation layer only
+make pipeline-temp # Run temperature layer only
+make pipeline-humidity # Run humidity layer only
+make pipeline-uv   # Run UV layer only
+
+# Verification
+make verify        # Run aggregated verification
+make verify-backend # Backend health + sample tiles
+make verify-pipeline # Pipeline smoke test
+make verify-mobile # Mobile regression checklist
 ```
 
 **Important**: The Makefile is the canonical entry point. Backend-local scripts (`start.sh`, `start_all_services.py`) are deprecated and will be removed.
@@ -173,11 +188,7 @@ If `API_BASE_URL` or `TILE_SERVER_URL` are set in `.env`, they override the plat
 Backend uses `.env` in `CLISApp-backend/`:
 
 ```bash
-# Required
-NASA_EARTHDATA_USERNAME=...
-NASA_EARTHDATA_PASSWORD=...
-COPERNICUS_USER=...
-COPERNICUS_PASSWORD=...
+# No credentials required - all data from Open-Meteo API (free, no auth)
 
 # Paths (defaults usually work)
 DATA_DIR=data
@@ -241,6 +252,14 @@ tail -f CLISApp-backend/logs/tiles/tiles-*.log
 
 If all requests show `pm25` regardless of layer selection, the UrlTile key is missing or broken.
 
+### Android Cleartext Traffic
+
+Android 9+ blocks HTTP by default. `AndroidManifest.xml` must include `android:usesCleartextTraffic="true"` on the `<application>` tag for the emulator to connect to local backend services over HTTP.
+
+### Tile Zoom Levels
+
+Default tile generation zoom levels are 6-11 (configured in `data_pipeline/processing/common/generate_tiles.py`). Higher zoom levels are upsampled from zoom 9 base tiles.
+
 ## Common Issues
 
 ### "iOS 26.2 is not installed"
@@ -281,13 +300,23 @@ Expected responses:
 - Tiles: `{"status":"healthy","service":"CLISApp Phase 0 Tile Server","tiles_available":true}`
 - Tile PNG: `200 OK` with `Content-Type: image/png`
 
-## Deployment Notes
+## Deployment
 
-**Not production-ready**. This is a development/prototype system. Before production:
+### GCloud Production Server
+
+- **Instance**: `clisapp-server` (zone: `us-central1-a`, machine: `e2-micro`)
+- **External IP**: `136.114.38.138`
+- **Project path**: `/opt/clisapp/CLISAPP`
+- **Venv**: `/opt/clisapp/venv`
+- **Services**: `clisapp-api` + `clisapp-tiles` (systemd)
+- **Setup script**: `/home/ubuntu/gcp-setup.sh`
+
+### Deployment Notes
+
+This is a development/prototype system. Before production:
 1. Replace mock region data with real Queensland LGA/suburb data
 2. Implement proper authentication/authorization
 3. Add rate limiting and caching
-4. Set up proper tile generation pipeline
-5. Configure CORS policies
-6. Use production-grade tile storage (CDN)
-7. Add monitoring and error tracking
+4. Configure CORS policies
+5. Use production-grade tile storage (CDN)
+6. Add monitoring and error tracking

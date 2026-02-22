@@ -52,7 +52,7 @@ Shows where logs are stored and provides commands to view/tail API and tile serv
 make verify
 ```
 
-**Status: Planned / WIP** - Run verification/health checks. See `make help` and `_bmad-output/implementation-artifacts/sprint-status.yaml` for current implementation status.
+Runs aggregated verification (backend health, pipeline smoke test, mobile checklist).
 
 ## Repository Structure
 
@@ -90,7 +90,9 @@ For more details, see:
 - Health endpoint: `GET /health`
 
 **Data Pipeline:**
-- Pipeline scripts: `CLISApp-backend/data_pipeline/pipeline_scripts/` - One-click scripts per layer
+- Orchestrator: `scripts/pipeline.py` - Calls `process_all_layers` once for all 5 layers
+- Module: `data_pipeline.processing.openmeteo.process_all_layers` - Fetches data, generates GeoTIFFs and tiles
+- Per-layer runners in `data_pipeline/pipeline_scripts/` are kept for standalone use
 
 ## Climate Data Sources & Paths
 
@@ -135,6 +137,8 @@ Use `10.0.2.2` (special Android emulator IP that maps to host machine's localhos
 - API: `http://10.0.2.2:8080`
 - Tiles: `http://10.0.2.2:8000/tiles`
 
+**Note**: `AndroidManifest.xml` must include `android:usesCleartextTraffic="true"` for HTTP connections to work on Android 9+.
+
 ### iOS Production HTTP Access
 The iOS app allows HTTP access to the production API host via `Info.plist` so the simulator/device can reach `http://136.114.38.138:8080`.
 
@@ -148,6 +152,33 @@ _bmad-output/verification-evidence/<date>/mobile/android/
 ```
 
 This convention ensures consistent tracking of manual mobile verification across development cycles.
+
+## GCloud Deployment
+
+The backend is deployed on Google Cloud Compute Engine:
+
+- **Instance**: `clisapp-server` (zone: `us-central1-a`, machine: `e2-micro`)
+- **Project path**: `/opt/clisapp/CLISAPP`
+- **Venv**: `/opt/clisapp/venv`
+- **Services**: `clisapp-api` + `clisapp-tiles` (systemd, user: ubuntu)
+
+```bash
+# SSH into server
+gcloud compute ssh clisapp-server --zone=us-central1-a
+
+# Update code and restart
+gcloud compute ssh clisapp-server --zone=us-central1-a --command="cd /opt/clisapp/CLISAPP && sudo git pull origin main"
+gcloud compute ssh clisapp-server --zone=us-central1-a --command="sudo systemctl restart clisapp-api clisapp-tiles"
+
+# Run pipeline on server
+gcloud compute ssh clisapp-server --zone=us-central1-a --command="cd /opt/clisapp/CLISAPP/CLISApp-backend && /opt/clisapp/venv/bin/python -m data_pipeline.processing.openmeteo.process_all_layers"
+
+# Health checks
+curl http://136.114.38.138:8080/api/v1/health
+curl http://136.114.38.138:8000/health
+```
+
+Setup script: `gcp-setup.sh` (on server at `/home/ubuntu/gcp-setup.sh`).
 
 ## Next Steps
 
@@ -170,5 +201,16 @@ This convention ensures consistent tracking of manual mobile verification across
 | `make api-down` | Stop API service only |
 | `make tiles-up` | Start tile server only |
 | `make tiles-down` | Stop tile server only |
-| `make pipeline` | Run data pipeline (WIP) |
-| `make verify` | Run verification checks (planned) |
+| `make pipeline` | Run full data pipeline (all 5 layers) |
+| `make update-data` | Fetch latest data only (no tile generation) |
+| `make pipeline-pm25` | Run PM2.5 layer pipeline |
+| `make pipeline-precip` | Run precipitation layer pipeline |
+| `make pipeline-temp` | Run temperature layer pipeline |
+| `make pipeline-humidity` | Run humidity layer pipeline |
+| `make pipeline-uv` | Run UV layer pipeline |
+| `make verify` | Run aggregated verification |
+| `make verify-backend` | Verify backend health + sample tiles |
+| `make verify-pipeline` | Pipeline smoke test with fixtures |
+| `make verify-mobile` | Mobile regression checklist |
+| `make check-boundaries` | Check architectural boundaries |
+| `make android-release` | Build Android release APK |
