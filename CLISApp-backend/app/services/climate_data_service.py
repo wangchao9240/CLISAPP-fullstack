@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+import json
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
@@ -35,6 +36,7 @@ class ClimateDataService:
         base_path = (
             Path(__file__).resolve().parents[2] / "data" / "processing"
         )
+        self._tiles_path = Path(__file__).resolve().parents[2] / "tiles"
 
         self._order: List[ClimateLayer] = list(CLIMATE_LAYER_CONFIGS.keys())
         self._layers: Dict[ClimateLayer, _LayerSettings] = {
@@ -124,12 +126,20 @@ class ClimateDataService:
                 layer=layer,
                 value=round(value, layer_settings.precision),
                 unit=layer_settings.unit,
-                timestamp=datetime.utcnow(),
+                timestamp=self._get_layer_timestamp(layer),
                 quality="estimated",
                 category=category,
             )
 
         return results
+
+    def _get_layer_timestamp(self, layer: ClimateLayer) -> datetime:
+        try:
+            meta_path = self._tiles_path / layer.value / "metadata.json"
+            with meta_path.open() as f:
+                return datetime.fromisoformat(json.load(f)["generated_at"].replace("Z", "+00:00"))
+        except Exception:
+            return datetime.utcnow()
 
     def _sample_layer(
         self,

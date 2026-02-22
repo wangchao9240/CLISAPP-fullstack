@@ -5,6 +5,7 @@
 # Run `make help` to see all available targets.
 
 .DEFAULT_GOAL := help
+VENV_PYTHON := $(shell [ -x CLISApp-backend/venv/bin/python ] && echo CLISApp-backend/venv/bin/python || echo python3)
 
 # ==============================================================================
 # HELP
@@ -143,10 +144,19 @@ pipeline: ## Run all layer pipelines (PM2.5, precipitation, temperature, humidit
 		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
 		exit 1; \
 	}
-	@python3 scripts/pipeline.py
+	@$(VENV_PYTHON) scripts/pipeline.py
 
 .PHONY: pipeline-all
 pipeline-all: pipeline ## Alias for 'pipeline' - run all layer pipelines
+
+.PHONY: update-data
+update-data: ## Fetch latest data for all layers (download only, no tile generation)
+	@command -v python3 >/dev/null 2>&1 || { \
+		echo "  FAIL python3"; \
+		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
+		exit 1; \
+	}
+	@$(VENV_PYTHON) scripts/update_data.py
 
 .PHONY: pipeline-download
 pipeline-download: ## Run download stage for specific layer (requires LAYER=...)
@@ -161,7 +171,7 @@ pipeline-download: ## Run download stage for specific layer (requires LAYER=...)
 		echo "Supported layers: pm25, precipitation, uv, temperature, humidity"; \
 		exit 1; \
 	fi
-	@python3 scripts/pipeline_stage.py download --layer $(LAYER)
+	@$(VENV_PYTHON) scripts/pipeline_stage.py download --layer $(LAYER)
 
 .PHONY: pipeline-process
 pipeline-process: ## Run process stage for specific layer (requires LAYER=...)
@@ -176,7 +186,7 @@ pipeline-process: ## Run process stage for specific layer (requires LAYER=...)
 		echo "Supported layers: pm25, precipitation, uv, temperature, humidity"; \
 		exit 1; \
 	fi
-	@python3 scripts/pipeline_stage.py process --layer $(LAYER)
+	@$(VENV_PYTHON) scripts/pipeline_stage.py process --layer $(LAYER)
 
 .PHONY: pipeline-tiles
 pipeline-tiles: ## Run tiles generation stage for specific layer (requires LAYER=...)
@@ -191,7 +201,7 @@ pipeline-tiles: ## Run tiles generation stage for specific layer (requires LAYER
 		echo "Supported layers: pm25, precipitation, uv, temperature, humidity"; \
 		exit 1; \
 	fi
-	@python3 scripts/pipeline_stage.py tiles --layer $(LAYER)
+	@$(VENV_PYTHON) scripts/pipeline_stage.py tiles --layer $(LAYER)
 
 .PHONY: pipeline-pm25
 pipeline-pm25: ## Run PM2.5 layer pipeline
@@ -200,7 +210,7 @@ pipeline-pm25: ## Run PM2.5 layer pipeline
 		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
 		exit 1; \
 	}
-	@python3 scripts/run_pipeline_layer.py pm25
+	@$(VENV_PYTHON) scripts/run_pipeline_layer.py pm25
 
 .PHONY: pipeline-precip
 pipeline-precip: ## Run precipitation layer pipeline
@@ -209,7 +219,7 @@ pipeline-precip: ## Run precipitation layer pipeline
 		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
 		exit 1; \
 	}
-	@python3 scripts/run_pipeline_layer.py precip
+	@$(VENV_PYTHON) scripts/run_pipeline_layer.py precip
 
 .PHONY: pipeline-temp
 pipeline-temp: ## Run temperature layer pipeline
@@ -218,7 +228,7 @@ pipeline-temp: ## Run temperature layer pipeline
 		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
 		exit 1; \
 	}
-	@python3 scripts/run_pipeline_layer.py temp
+	@$(VENV_PYTHON) scripts/run_pipeline_layer.py temp
 
 .PHONY: pipeline-humidity
 pipeline-humidity: ## Run humidity layer pipeline
@@ -227,7 +237,7 @@ pipeline-humidity: ## Run humidity layer pipeline
 		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
 		exit 1; \
 	}
-	@python3 scripts/run_pipeline_layer.py humidity
+	@$(VENV_PYTHON) scripts/run_pipeline_layer.py humidity
 
 .PHONY: pipeline-uv
 pipeline-uv: ## Run UV layer pipeline
@@ -236,7 +246,7 @@ pipeline-uv: ## Run UV layer pipeline
 		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
 		exit 1; \
 	}
-	@python3 scripts/run_pipeline_layer.py uv
+	@$(VENV_PYTHON) scripts/run_pipeline_layer.py uv
 
 # ==============================================================================
 # VERIFICATION

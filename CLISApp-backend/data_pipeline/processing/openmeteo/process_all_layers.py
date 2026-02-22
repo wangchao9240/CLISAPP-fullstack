@@ -128,6 +128,10 @@ def _write_geotiff(layer: str, data: np.ndarray, timestamp: str) -> Path:
     if latest_link.exists() or latest_link.is_symlink():
         latest_link.unlink()
     latest_link.symlink_to(tif_path.name)
+    old_files = [p for p in out_dir.glob(f"{basename}_openmeteo_*.tif") if p.name != tif_path.name]
+    for old_file in old_files:
+        old_file.unlink()
+    logger.info("Removed %d old %s GeoTIFF files", len(old_files), layer)
 
     return tif_path
 
