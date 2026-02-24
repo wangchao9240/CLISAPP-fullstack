@@ -197,3 +197,5 @@ CLISApp-backend/phase2-data-pipeline/data/
 # ===================================
 _bmad/
 _bmad-output/
+.agents
+.gemini
