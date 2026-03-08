@@ -9,11 +9,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import subprocess
 import sys
-from datetime import datetime
+import traceback
+import uuid
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Literal
 
 import numpy as np
 import rasterio
@@ -22,6 +25,12 @@ from rasterio.transform import from_bounds
 
 from data_pipeline.config.grid_config import GRID_POINTS, LAYER_CONFIG, QLD_BOUNDS
 from data_pipeline.downloads.openmeteo.fetch_realtime import OpenMeteoFetcher
+from data_pipeline.pipeline_logger import (
+    LayerResult,
+    PipelineExecutionLog,
+    configure_pipeline_logging,
+    log_layer_result,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -149,8 +158,23 @@ def _generate_tiles(layer: str, tif_path: Path) -> None:
     subprocess.run(cmd, check=True)
 
 
-async def process_all_layers(skip_tiles: bool = False) -> Dict[str, Path]:
+def _normalize_trigger_type(raw_value: str | None) -> Literal["scheduled", "manual"]:
+    if (raw_value or "").strip().lower() == "scheduled":
+        return "scheduled"
+    return "manual"
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
+async def process_all_layers(
+    skip_tiles: bool = False,
+    trigger_type: Literal["scheduled", "manual"] = "manual",
+) -> tuple[Dict[str, Path], PipelineExecutionLog]:
     """Fetch all layers from Open-Meteo and generate per-layer GeoTIFF + tiles."""
+    run_id = str(uuid.uuid4())
+    run_start = _utcnow()
     logger.info("Fetching Open-Meteo climate data for %d grid points", len(GRID_POINTS))
 
     async with OpenMeteoFetcher() as fetcher:
@@ -160,34 +184,71 @@ async def process_all_layers(skip_tiles: bool = False) -> Dict[str, Path]:
         raise RuntimeError("Open-Meteo fetch returned no data")
 
     arrays = _build_layer_arrays(climate_data)
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    timestamp = _utcnow().strftime("%Y%m%d_%H%M%S")
 
     outputs: Dict[str, Path] = {}
+    layer_results: dict[str, LayerResult] = {}
     for layer, array in arrays.items():
-        coverage = float(np.count_nonzero(~np.isnan(array))) / float(array.size) * 100.0
-        logger.info("%s coverage: %.1f%%", layer, coverage)
+        layer_start = _utcnow()
 
-        tif_path = _write_geotiff(layer, array, timestamp)
-        if not skip_tiles:
-            _generate_tiles(layer, tif_path)
-        else:
-            logger.info("Skipping tile generation (geotiff-only mode)")
-        outputs[layer] = tif_path
+        try:
+            coverage = float(np.count_nonzero(~np.isnan(array))) / float(array.size) * 100.0
+            logger.info("%s coverage: %.1f%%", layer, coverage)
 
-    return outputs
+            tif_path = _write_geotiff(layer, array, timestamp)
+            if not skip_tiles:
+                _generate_tiles(layer, tif_path)
+            else:
+                logger.info("Skipping tile generation (geotiff-only mode)")
+            outputs[layer] = tif_path
+
+            layer_end = _utcnow()
+            layer_result = LayerResult(
+                layer_name=layer,
+                status="success",
+                start_time=layer_start,
+                end_time=layer_end,
+                duration_seconds=(layer_end - layer_start).total_seconds(),
+            )
+            layer_results[layer] = layer_result
+            log_layer_result(logger, run_id, layer_result, data_timestamp=timestamp)
+        except Exception as exc:
+            layer_end = _utcnow()
+            layer_result = LayerResult(
+                layer_name=layer,
+                status="failed",
+                start_time=layer_start,
+                end_time=layer_end,
+                duration_seconds=(layer_end - layer_start).total_seconds(),
+                error_message=str(exc),
+                error_traceback=traceback.format_exc(),
+            )
+            layer_results[layer] = layer_result
+            log_layer_result(logger, run_id, layer_result, data_timestamp=timestamp)
+            logger.error("Layer %s processing failed: %s", layer, exc, exc_info=True)
+            continue
+
+    execution_log = PipelineExecutionLog(
+        run_id=run_id,
+        start_time=run_start,
+        end_time=_utcnow(),
+        trigger_type=trigger_type,
+        layer_results=layer_results,
+    )
+    logger.info(execution_log.format_summary(data_timestamp=timestamp))
+    return outputs, execution_log
 
 
 def main() -> int:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
+    configure_pipeline_logging()
 
     try:
-        import os
-
         skip = os.environ.get("SKIP_TILES", "").strip().lower() in ("1", "true", "yes") or "--geotiff-only" in sys.argv
-        outputs = asyncio.run(process_all_layers(skip_tiles=skip))
+        trigger_type = _normalize_trigger_type(os.environ.get("PIPELINE_TRIGGER"))
+        outputs, execution_log = asyncio.run(
+            process_all_layers(skip_tiles=skip, trigger_type=trigger_type)
+        )
+        logger.info("Pipeline run id: %s", execution_log.run_id)
         logger.info("Generated layers: %s", ", ".join(sorted(outputs.keys())))
         for layer, path in outputs.items():
             logger.info("%s GeoTIFF: %s", layer, path)

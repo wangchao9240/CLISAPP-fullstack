@@ -27,9 +27,10 @@ async def main():
     logger.info("Step 1: Fetching fresh Open-Meteo data for all layers")
     logger.info("=" * 60)
     fetch_start = time.time()
-    outputs = await process_all_layers(skip_tiles=True)
+    outputs, execution_log = await process_all_layers(skip_tiles=True)
     fetch_elapsed = time.time() - fetch_start
     logger.info(f"Data fetch complete in {fetch_elapsed:.1f}s")
+    logger.info("Pipeline execution log run_id=%s", execution_log.run_id)
 
     # Step 2: Generate tiles for each layer
     results = []

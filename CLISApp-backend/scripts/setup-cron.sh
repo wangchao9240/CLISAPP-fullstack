@@ -32,11 +32,12 @@ VENV_PYTHON="/opt/clisapp/venv/bin/python"
 RUN_AS_USER="ubuntu"
 
 log() {
-  echo "$(date '+%Y-%m-%d %H:%M:%S') $1" >> "$LOG_FILE"
+  echo "$(date '+%Y-%m-%d %H:%M:%S') $1"
 }
 
 mkdir -p "$(dirname "$LOG_FILE")"
 touch "$LOG_FILE"
+exec > >(tee -a "$LOG_FILE") 2> >(tee -a "$LOG_FILE" >&2)
 
 log "✅ Pipeline started"
 START_TS=$(date +%s)
@@ -59,11 +60,12 @@ if [ -f .env ]; then
   set +a
 fi
 export PYTHONPATH=/opt/clisapp/CLISAPP/CLISApp-backend
+export PIPELINE_TRIGGER=scheduled
 exec /opt/clisapp/venv/bin/python -m data_pipeline.processing.openmeteo.process_all_layers
 INNER
 )
 
-if sudo -u "$RUN_AS_USER" bash -lc "$RUN_CMD" >> "$LOG_FILE" 2>&1; then
+if sudo -u "$RUN_AS_USER" bash -lc "$RUN_CMD"; then
   STATUS=0
 else
   STATUS=$?
@@ -84,10 +86,15 @@ EOF_RUNNER
 chmod +x "$RUN_SCRIPT"
 
 step "Installing cron entry (every 4 hours)"
-CRON_LINE="0 */4 * * * /opt/clisapp/run-pipeline.sh >> /var/log/clisapp-pipeline.log 2>&1"
+CRON_LINE="0 */4 * * * /opt/clisapp/run-pipeline.sh"
 ( crontab -l 2>/dev/null | grep -v "/opt/clisapp/run-pipeline.sh"; echo "$CRON_LINE" ) | crontab -
 
 step "Cron installed"
+
+step "Installing logrotate config for pipeline log"
+cp "$SCRIPT_DIR/logrotate-clisapp-pipeline" /etc/logrotate.d/clisapp-pipeline
+chmod 644 /etc/logrotate.d/clisapp-pipeline
+step "Logrotate installed (rotate at 10MB, keep 4 compressed copies)"
 
 if [ "${USE_SYSTEMD:-}" = "1" ]; then
   step "Installing systemd service and timer"
