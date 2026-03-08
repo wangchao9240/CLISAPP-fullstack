@@ -22,12 +22,14 @@ fail() {
 }
 
 step "Creating pipeline runner script at $RUN_SCRIPT"
-cat > "$RUN_SCRIPT" <<'EOF'
+cat > "$RUN_SCRIPT" <<'EOF_RUNNER'
 #!/bin/bash
-set -e
+set -euo pipefail
 
 LOG_FILE="/var/log/clisapp-pipeline.log"
 BACKEND_DIR="/opt/clisapp/CLISAPP/CLISApp-backend"
+VENV_PYTHON="/opt/clisapp/venv/bin/python"
+RUN_AS_USER="ubuntu"
 
 log() {
   echo "$(date '+%Y-%m-%d %H:%M:%S') $1" >> "$LOG_FILE"
@@ -39,13 +41,29 @@ touch "$LOG_FILE"
 log "✅ Pipeline started"
 START_TS=$(date +%s)
 
-if ! docker ps --format '{{.Names}}' | grep -q '^clisapp-backend$'; then
-  log "❌ Backend container not running"
+if [ ! -x "$VENV_PYTHON" ]; then
+  log "❌ Python runtime not found at $VENV_PYTHON"
   exit 1
 fi
 
-cd "$BACKEND_DIR"
-if docker exec clisapp-backend python -m data_pipeline.processing.openmeteo.process_all_layers; then
+if [ ! -d "$BACKEND_DIR" ]; then
+  log "❌ Backend directory not found at $BACKEND_DIR"
+  exit 1
+fi
+
+RUN_CMD=$(cat <<'INNER'
+cd /opt/clisapp/CLISAPP/CLISApp-backend
+if [ -f .env ]; then
+  set -a
+  . ./.env
+  set +a
+fi
+export PYTHONPATH=/opt/clisapp/CLISAPP/CLISApp-backend
+exec /opt/clisapp/venv/bin/python -m data_pipeline.processing.openmeteo.process_all_layers
+INNER
+)
+
+if sudo -u "$RUN_AS_USER" bash -lc "$RUN_CMD" >> "$LOG_FILE" 2>&1; then
   STATUS=0
 else
   STATUS=$?
@@ -61,7 +79,7 @@ else
 fi
 
 exit "$STATUS"
-EOF
+EOF_RUNNER
 
 chmod +x "$RUN_SCRIPT"
 
