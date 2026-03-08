@@ -4,7 +4,6 @@ FastAPI application entry point with API routes and middleware
 """
 
 import os
-import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -139,19 +138,6 @@ def create_application() -> FastAPI:
             }
         )
     
-    async def _pipeline_scheduler():
-        """Run pipeline every 4 hours in the background."""
-        INTERVAL = 4 * 60 * 60  # 4 hours in seconds
-        while True:
-            await asyncio.sleep(INTERVAL)
-            logger.info("Scheduler: starting scheduled pipeline run")
-            try:
-                from scripts.run_pipeline import main as run_pipeline
-                await run_pipeline()
-                logger.info("Scheduler: pipeline run complete")
-            except Exception as e:
-                logger.error(f"Scheduler: pipeline run failed: {e}", exc_info=True)
-
     @app.on_event("startup")
     async def startup_event():
         """Application startup tasks"""
@@ -162,10 +148,6 @@ def create_application() -> FastAPI:
         # Ensure data directories exist
         settings.create_data_directories()
         logger.info("Data directories initialized")
-
-        # Start background pipeline scheduler
-        asyncio.create_task(_pipeline_scheduler())
-        logger.info("Pipeline scheduler started (interval: 4h)")
 
     @app.on_event("shutdown")
     async def shutdown_event():
