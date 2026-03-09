@@ -87,7 +87,7 @@ chmod +x "$RUN_SCRIPT"
 
 step "Installing cron entry (every 4 hours)"
 CRON_LINE="0 */4 * * * /opt/clisapp/run-pipeline.sh"
-( crontab -l 2>/dev/null | grep -v "/opt/clisapp/run-pipeline.sh"; echo "$CRON_LINE" ) | crontab -
+( crontab -l 2>/dev/null | grep -v "/opt/clisapp/run-pipeline.sh" || true; echo "$CRON_LINE" ) | crontab -
 
 step "Cron installed"
 
