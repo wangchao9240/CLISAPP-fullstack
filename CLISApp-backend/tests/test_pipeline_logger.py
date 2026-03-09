@@ -33,7 +33,17 @@ class FakeMask:
         return FakeMask([[not cell for cell in row] for row in self.values])
 
 
+STUB_MODULES = [
+    "numpy", "rasterio", "rasterio.crs", "rasterio.transform",
+    "data_pipeline.downloads.openmeteo.fetch_realtime",
+]
+
+
 def ensure_scientific_stubs():
+    """Inject lightweight stubs for heavy scientific dependencies.
+
+    Tracks which modules were injected so cleanup can restore original state.
+    """
     if "numpy" not in sys.modules:
         numpy_module = types.ModuleType("numpy")
         numpy_module.float32 = float
@@ -106,11 +116,23 @@ def ensure_scientific_stubs():
         sys.modules["data_pipeline.downloads.openmeteo.fetch_realtime"] = fetch_module
 
 
-def load_process_module():
+@pytest.fixture()
+def process_module():
+    """Load process_all_layers with stubs, clean up sys.modules after test."""
+    saved = {k: sys.modules[k] for k in STUB_MODULES if k in sys.modules}
     ensure_scientific_stubs()
     sys.modules.pop("data_pipeline.config.grid_config", None)
     sys.modules.pop("data_pipeline.processing.openmeteo.process_all_layers", None)
-    return importlib.import_module("data_pipeline.processing.openmeteo.process_all_layers")
+    mod = importlib.import_module("data_pipeline.processing.openmeteo.process_all_layers")
+    yield mod
+    # Restore original modules or remove stubs
+    for key in STUB_MODULES:
+        if key in saved:
+            sys.modules[key] = saved[key]
+        else:
+            sys.modules.pop(key, None)
+    sys.modules.pop("data_pipeline.config.grid_config", None)
+    sys.modules.pop("data_pipeline.processing.openmeteo.process_all_layers", None)
 
 
 def test_pipeline_execution_log_and_layer_result_are_frozen():
@@ -188,8 +210,7 @@ def test_format_summary_with_mixed_results_is_parseable():
     assert payload["duration_seconds"] == pytest.approx(20.0)
 
 
-def test_process_all_layers_continues_after_single_layer_failure(monkeypatch, caplog):
-    process_module = load_process_module()
+def test_process_all_layers_continues_after_single_layer_failure(process_module, monkeypatch, caplog):
 
     class DummyFetcher:
         async def __aenter__(self):

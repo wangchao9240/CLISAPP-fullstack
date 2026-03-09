@@ -131,7 +131,7 @@ def _write_geotiff(layer: str, data: np.ndarray, timestamp: str) -> Path:
             variable=LAYER_FIELD_MAP[layer],
             units=layer_cfg.get("unit", ""),
             source="Open-Meteo",
-            creation_time=datetime.utcnow().isoformat(),
+            creation_time=_utcnow().isoformat(),
         )
 
     if latest_link.exists() or latest_link.is_symlink():
@@ -165,6 +165,12 @@ def _normalize_trigger_type(raw_value: str | None) -> Literal["scheduled", "manu
 
 
 def _utcnow() -> datetime:
+    """Return current UTC time as naive datetime (no tzinfo).
+
+    Uses datetime.now(UTC) to avoid deprecated utcnow(), then strips
+    tzinfo to stay consistent with naive-UTC convention used throughout
+    the pipeline codebase.
+    """
     return datetime.now(UTC).replace(tzinfo=None)
 
 
@@ -225,7 +231,6 @@ async def process_all_layers(
             )
             layer_results[layer] = layer_result
             log_layer_result(logger, run_id, layer_result, data_timestamp=timestamp)
-            logger.error("Layer %s processing failed: %s", layer, exc, exc_info=True)
             continue
 
     execution_log = PipelineExecutionLog(
@@ -254,6 +259,16 @@ def main() -> int:
             logger.info("%s GeoTIFF: %s", layer, path)
         return 0
     except Exception as exc:
+        # Log structured summary even on early failure (e.g. fetch stage)
+        run_id = str(uuid.uuid4())
+        fail_log = PipelineExecutionLog(
+            run_id=run_id,
+            start_time=_utcnow(),
+            end_time=_utcnow(),
+            trigger_type=trigger_type,
+            layer_results={},
+        )
+        logger.error(fail_log.format_summary())
         logger.error("Open-Meteo all-layers processing failed: %s", exc, exc_info=True)
         return 1
 
