@@ -1,8 +1,12 @@
 [Unit]
 Description=CLISApp pipeline refresh
 Wants=network-online.target
-After=network-online.target docker.service
+After=network-online.target
 
 [Service]
 Type=oneshot
+# Timer-triggered runs get "scheduled" via this env var.
+# For manual trigger with trigger_type="manual", use manual-pipeline-trigger.sh
+# or `make pipeline-manual` instead of `systemctl start` directly.
+Environment=PIPELINE_TRIGGER=scheduled
 ExecStart=/opt/clisapp/run-pipeline.sh

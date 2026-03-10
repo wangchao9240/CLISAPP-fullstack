@@ -146,6 +146,15 @@ pipeline: ## Run all layer pipelines (PM2.5, precipitation, temperature, humidit
 	}
 	@$(VENV_PYTHON) scripts/pipeline.py
 
+.PHONY: pipeline-manual
+pipeline-manual: ## Run pipeline with explicit manual trigger type
+	@command -v python3 >/dev/null 2>&1 || { \
+		echo "  FAIL python3"; \
+		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
+		exit 1; \
+	}
+	@PIPELINE_TRIGGER=manual $(VENV_PYTHON) scripts/pipeline.py
+
 .PHONY: pipeline-all
 pipeline-all: pipeline ## Alias for 'pipeline' - run all layer pipelines
 

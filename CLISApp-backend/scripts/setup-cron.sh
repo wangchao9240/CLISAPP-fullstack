@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 if [ "$(id -u)" -ne 0 ]; then
   echo "❌ Please run as root (sudo)."
@@ -27,6 +27,7 @@ cat > "$RUN_SCRIPT" <<'EOF_RUNNER'
 set -euo pipefail
 
 LOG_FILE="/var/log/clisapp-pipeline.log"
+LOCK_FILE="/var/lock/clisapp-pipeline.lock"
 BACKEND_DIR="/opt/clisapp/CLISAPP/CLISApp-backend"
 VENV_PYTHON="/opt/clisapp/venv/bin/python"
 RUN_AS_USER="ubuntu"
@@ -36,8 +37,15 @@ log() {
 }
 
 mkdir -p "$(dirname "$LOG_FILE")"
+mkdir -p "$(dirname "$LOCK_FILE")"
 touch "$LOG_FILE"
 exec > >(tee -a "$LOG_FILE") 2> >(tee -a "$LOG_FILE" >&2)
+
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+  log "⚠️ Pipeline already running; lock busy at $LOCK_FILE"
+  exit 75
+fi
 
 log "✅ Pipeline started"
 START_TS=$(date +%s)
@@ -60,7 +68,6 @@ if [ -f .env ]; then
   set +a
 fi
 export PYTHONPATH=/opt/clisapp/CLISAPP/CLISApp-backend
-export PIPELINE_TRIGGER=scheduled
 exec /opt/clisapp/venv/bin/python -m data_pipeline.processing.openmeteo.process_all_layers
 INNER
 )
@@ -85,11 +92,16 @@ EOF_RUNNER
 
 chmod +x "$RUN_SCRIPT"
 
-step "Installing cron entry (every 4 hours)"
-CRON_LINE="0 */4 * * * /opt/clisapp/run-pipeline.sh"
-( crontab -l 2>/dev/null | grep -v "/opt/clisapp/run-pipeline.sh" || true; echo "$CRON_LINE" ) | crontab -
-
-step "Cron installed"
+if [ "${USE_SYSTEMD:-}" != "1" ]; then
+  step "Installing cron entry (every 4 hours)"
+  CRON_LINE="0 */4 * * * PIPELINE_TRIGGER=scheduled /opt/clisapp/run-pipeline.sh"
+  ( crontab -l 2>/dev/null | grep -v "/opt/clisapp/run-pipeline.sh" || true; echo "$CRON_LINE" ) | crontab -
+  step "Cron installed"
+else
+  # Remove any existing cron entry to prevent duplicate scheduling with systemd timer
+  ( crontab -l 2>/dev/null | grep -v "/opt/clisapp/run-pipeline.sh" || true ) | crontab -
+  step "Skipping cron install (systemd timer will be used instead); removed existing cron entry if present"
+fi
 
 step "Installing logrotate config for pipeline log"
 cp "$SCRIPT_DIR/logrotate-clisapp-pipeline" /etc/logrotate.d/clisapp-pipeline
