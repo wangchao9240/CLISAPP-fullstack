@@ -59,7 +59,9 @@ OUTPUT_BASENAME_MAP: Dict[str, str] = {
 }
 
 
-def _build_layer_arrays(climate_data: Dict[str, Dict[str, Any]]) -> Dict[str, np.ndarray]:
+def _build_layer_arrays(
+    climate_data: Dict[str, Dict[str, Any]]
+) -> Dict[str, np.ndarray]:
     """Split pointwise climate data into 2D arrays for each layer."""
     unique_lats = sorted({point["latitude"] for point in GRID_POINTS}, reverse=True)
     unique_lons = sorted({point["longitude"] for point in GRID_POINTS})
@@ -92,6 +94,20 @@ def _build_layer_arrays(climate_data: Dict[str, Dict[str, Any]]) -> Dict[str, np
                 continue
 
     return arrays
+
+
+def _extract_representative_values(arrays: dict[str, Any]) -> dict[str, float]:
+    """Extract conservative Queensland-wide values for health alert checks."""
+    representative_values: dict[str, float] = {}
+
+    for layer, raw_array in arrays.items():
+        array = np.asarray(raw_array, dtype=np.float32)
+        if array.size == 0 or np.isnan(array).all():
+            continue
+
+        representative_values[layer] = float(np.nanmax(array))
+
+    return representative_values
 
 
 def _write_geotiff(layer: str, data: np.ndarray, timestamp: str) -> Path:
@@ -137,7 +153,11 @@ def _write_geotiff(layer: str, data: np.ndarray, timestamp: str) -> Path:
     if latest_link.exists() or latest_link.is_symlink():
         latest_link.unlink()
     latest_link.symlink_to(tif_path.name)
-    old_files = [p for p in out_dir.glob(f"{basename}_openmeteo_*.tif") if p.name != tif_path.name]
+    old_files = [
+        p
+        for p in out_dir.glob(f"{basename}_openmeteo_*.tif")
+        if p.name != tif_path.name
+    ]
     for old_file in old_files:
         old_file.unlink()
     logger.info("Removed %d old %s GeoTIFF files", len(old_files), layer)
@@ -198,7 +218,9 @@ async def process_all_layers(
         layer_start = _utcnow()
 
         try:
-            coverage = float(np.count_nonzero(~np.isnan(array))) / float(array.size) * 100.0
+            coverage = (
+                float(np.count_nonzero(~np.isnan(array))) / float(array.size) * 100.0
+            )
             logger.info("%s coverage: %.1f%%", layer, coverage)
 
             tif_path = _write_geotiff(layer, array, timestamp)
@@ -241,6 +263,23 @@ async def process_all_layers(
         layer_results=layer_results,
     )
     logger.info(execution_log.format_summary(data_timestamp=timestamp))
+
+    try:
+        from app.core.config import settings
+        from app.services.notification_service import NotificationService
+
+        representative_values = _extract_representative_values(arrays)
+        notification_service = NotificationService(
+            credentials_path=settings.firebase_credentials_path,
+            thresholds_path=settings.health_thresholds_path,
+        )
+        notification_result = notification_service.check_and_notify(
+            representative_values
+        )
+        logger.info("Notification check result: %s", notification_result)
+    except Exception as exc:
+        logger.warning("Notification check failed (non-fatal): %s", exc, exc_info=True)
+
     return outputs, execution_log
 
 
@@ -248,7 +287,10 @@ def main() -> int:
     configure_pipeline_logging()
 
     try:
-        skip = os.environ.get("SKIP_TILES", "").strip().lower() in ("1", "true", "yes") or "--geotiff-only" in sys.argv
+        skip = (
+            os.environ.get("SKIP_TILES", "").strip().lower() in ("1", "true", "yes")
+            or "--geotiff-only" in sys.argv
+        )
         trigger_type = _normalize_trigger_type(os.environ.get("PIPELINE_TRIGGER"))
         outputs, execution_log = asyncio.run(
             process_all_layers(skip_tiles=skip, trigger_type=trigger_type)

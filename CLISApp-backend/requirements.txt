@@ -31,6 +31,9 @@ httpx==0.25.2
 aiofiles==23.2.1
 tenacity>=8.2.3  # Retry logic for API calls
 
+# Firebase Cloud Messaging
+firebase-admin>=6.0.0
+
 # Image Processing for Tiles
 Pillow>=10.2.0
 matplotlib>=3.8.2
