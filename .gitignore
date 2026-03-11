@@ -162,6 +162,7 @@ logs/
 # Large data files
 CLISApp-frontend/src/assets/geodata/geodata.geojson
 CLISApp-frontend/src/assets/geodata/geodata.json
+CLISApp-frontend/android/app/google-services.json
 
 # Backend data directories
 CLISApp-backend/data/downloads/*

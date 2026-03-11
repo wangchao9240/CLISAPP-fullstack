@@ -25,11 +25,14 @@ end
 
 target 'CLISApp' do
   config = use_native_modules!
-  
+
   # Setup permissions - only include the ones you need
   setup_permissions([
     'LocationWhenInUse',
   ])
+
+  use_frameworks! :linkage => :static
+  $RNFirebaseAsStaticFramework = true
 
   use_react_native!(
     :path => config[:reactNativePath],
