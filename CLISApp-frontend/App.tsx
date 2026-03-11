@@ -12,6 +12,7 @@ import { MapScreen } from './src/screens/MapScreen';
 import {
   initializeFCM,
   onTokenRefresh,
+  setupForegroundHandler,
 } from './src/services/notificationService';
 
 function App(): React.JSX.Element {
@@ -23,8 +24,11 @@ function App(): React.JSX.Element {
     void initializeFCM();
 
     const unsubscribe = onTokenRefresh();
+    const unsubscribeFromForegroundMessages = setupForegroundHandler();
+
     return () => {
       unsubscribe();
+      unsubscribeFromForegroundMessages();
     };
   }, []);
 
