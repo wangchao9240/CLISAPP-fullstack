@@ -494,7 +494,7 @@ class PM25TileGenerator:
             if np.all(rgba_data[:, :, 3] == 0):  # fully transparent
                 return None
 
-            img = Image.fromarray(rgba_data, 'RGBA')
+            img = Image.fromarray(rgba_data)
 
             tile_dir = os.path.join(self.output_dir, self.layer_name, str(zoom), str(x))
             os.makedirs(tile_dir, exist_ok=True)
