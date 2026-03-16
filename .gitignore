@@ -194,6 +194,10 @@ CLISApp-backend/phase2-data-pipeline/data/
 # Trash artifacts
 .trash_*
 
+# Local project data and notes
+additional-data/
+client-meeting-update.md
+
 # ===================================
 # BMAD / Project Management
 # ===================================
