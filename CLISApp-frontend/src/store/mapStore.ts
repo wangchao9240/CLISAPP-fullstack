@@ -35,7 +35,7 @@ interface MapState {
   openRegionInfo: (payload: {
     regionId: string;
     regionName: string;
-    regionType: 'lga' | 'suburb';
+    regionType: string;
     climate: RegionClimateOverview | null;
   }) => void;
   closeRegionInfo: () => void;
@@ -45,14 +45,14 @@ interface MapState {
   resetMapState: () => void;
 }
 
-const MAP_STORE_VERSION = 2;
+const MAP_STORE_VERSION = 3;
 
 export const useMapStore = create<MapState>()(
   persist(
     (set, get) => ({
       region: QUEENSLAND_REGION,
       activeLayer: DEFAULT_LAYER,
-      mapLevel: 'lga',
+      mapLevel: 'coarse',
       selectedRegionId: undefined,
       isLoading: false,
       tileLoadingProgress: 0,
@@ -73,7 +73,7 @@ export const useMapStore = create<MapState>()(
       setMapLevel: (level) => set({ mapLevel: level, isLoading: true }),
       toggleMapLevel: () => {
         const currentLevel = get().mapLevel;
-        const newLevel = currentLevel === 'lga' ? 'suburb' : 'lga';
+        const newLevel = currentLevel === 'coarse' ? 'ssc' : 'coarse';
         set({ mapLevel: newLevel, isLoading: true });
       },
       setSelectedRegion: (selectedRegionId) => set({ selectedRegionId }),
@@ -125,7 +125,7 @@ export const useMapStore = create<MapState>()(
         set({
           region: QUEENSLAND_REGION,
           activeLayer: DEFAULT_LAYER,
-          mapLevel: 'lga',
+          mapLevel: 'coarse',
           selectedRegionId: undefined,
           isLoading: false,
           tileLoadingProgress: 0,
@@ -150,9 +150,20 @@ export const useMapStore = create<MapState>()(
         if (!persistedState) {
           return persistedState;
         }
+
+        const persistedMapLevel =
+          typeof persistedState.mapLevel === 'string'
+            ? persistedState.mapLevel === 'lga'
+              ? 'coarse'
+              : persistedState.mapLevel === 'suburb'
+                ? 'ssc'
+                : persistedState.mapLevel
+            : undefined;
+
         // Ensure deterministic startup layer after config changes.
         return {
           ...persistedState,
+          ...(persistedMapLevel ? { mapLevel: persistedMapLevel } : {}),
           activeLayer: DEFAULT_LAYER,
         };
       },

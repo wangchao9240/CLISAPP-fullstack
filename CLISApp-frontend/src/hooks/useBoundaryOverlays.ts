@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { Region } from '../types/map.types';
 import { useMapStore } from '../store/mapStore';
-import { BoundaryFeature, loadLgaBoundaries, loadSuburbsForLga } from '../services/boundaries/BoundaryStore';
+import { BoundaryFeature, loadCoarseBoundaries, loadSscsForCoarse } from '../services/boundaries/BoundaryStore';
 import { point, polygon, multiPolygon } from '@turf/helpers';
 import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
 
@@ -14,12 +14,12 @@ export interface MapPolygonOverlay {
   zIndex: number;
 }
 
-const LGA_STROKE = 'rgba(96, 96, 96, 0.45)';
-const SUBURB_STROKE = 'rgba(128, 128, 128, 0.55)';
-const SUBURB_ZOOM_THRESHOLD = 9;
-const LGA_BASE_WIDTH = 1;
-const LGA_ACTIVE_WIDTH = 1.4;
-const SUBURB_WIDTH = 0.8;
+const COARSE_STROKE = 'rgba(96, 96, 96, 0.45)';
+const SSC_STROKE = 'rgba(128, 128, 128, 0.55)';
+const SSC_ZOOM_THRESHOLD = 9;
+const COARSE_BASE_WIDTH = 1;
+const COARSE_ACTIVE_WIDTH = 1.4;
+const SSC_WIDTH = 0.8;
 
 const getZoomLevel = (region: Region): number => {
   const z = Math.log2(360 / region.latitudeDelta);
@@ -56,28 +56,28 @@ const buildPolygonOverlays = (
 
 const useBoundaryOverlays = () => {
   const region = useMapStore((state) => state.region);
-  const [lgaFeatures] = useState<BoundaryFeature[]>(() => loadLgaBoundaries());
+  const [coarseFeatures] = useState<BoundaryFeature[]>(() => loadCoarseBoundaries());
   const [overlays, setOverlays] = useState<MapPolygonOverlay[]>([]);
-  const [activeLga, setActiveLga] = useState<BoundaryFeature | null>(null);
+  const [activeCoarse, setActiveCoarse] = useState<BoundaryFeature | null>(null);
   const lastRegionKeyRef = useRef<string>('');
   const turfCacheRef = useRef<Record<string, any>>({});
 
   const updateOverlays = useCallback((targetRegion: Region) => {
     const zoom = getZoomLevel(targetRegion);
 
-    if (zoom < SUBURB_ZOOM_THRESHOLD) {
-      const lgaOverlays = lgaFeatures.flatMap((feature) =>
-        buildPolygonOverlays(feature, LGA_STROKE, LGA_BASE_WIDTH, 2)
+    if (zoom < SSC_ZOOM_THRESHOLD) {
+      const coarseOverlays = coarseFeatures.flatMap((feature) =>
+        buildPolygonOverlays(feature, COARSE_STROKE, COARSE_BASE_WIDTH, 2)
       );
-      setActiveLga(null);
-      setOverlays(lgaOverlays);
+      setActiveCoarse(null);
+      setOverlays(coarseOverlays);
       return;
     }
 
     const center = point([targetRegion.longitude, targetRegion.latitude]);
 
     let containing: BoundaryFeature | null = null;
-    for (const feature of lgaFeatures) {
+    for (const feature of coarseFeatures) {
       const [minLng, minLat, maxLng, maxLat] = feature.bbox;
       if (
         targetRegion.longitude < minLng ||
@@ -99,25 +99,25 @@ const useBoundaryOverlays = () => {
     }
 
     if (!containing) {
-      setActiveLga(null);
+      setActiveCoarse(null);
       setOverlays([]);
       return;
     }
 
-    if (activeLga?.id === containing.id) {
+    if (activeCoarse?.id === containing.id) {
       return;
     }
 
-    const suburbFeatures = loadSuburbsForLga(containing.id);
-    const suburbOverlays = suburbFeatures.flatMap((suburb) =>
-      buildPolygonOverlays(suburb, SUBURB_STROKE, SUBURB_WIDTH, 3)
+    const sscFeatures = loadSscsForCoarse(containing.id);
+    const sscOverlays = sscFeatures.flatMap((ssc) =>
+      buildPolygonOverlays(ssc, SSC_STROKE, SSC_WIDTH, 3)
     );
 
-    const containingOverlays = buildPolygonOverlays(containing, LGA_STROKE, LGA_ACTIVE_WIDTH, 4);
+    const containingOverlays = buildPolygonOverlays(containing, COARSE_STROKE, COARSE_ACTIVE_WIDTH, 4);
 
-    setActiveLga(containing);
-    setOverlays([...containingOverlays, ...suburbOverlays]);
-  }, [activeLga, lgaFeatures]);
+    setActiveCoarse(containing);
+    setOverlays([...containingOverlays, ...sscOverlays]);
+  }, [activeCoarse, coarseFeatures]);
 
   useEffect(() => {
     const key = regionKey(region);
@@ -134,4 +134,3 @@ const useBoundaryOverlays = () => {
 };
 
 export default useBoundaryOverlays;
-

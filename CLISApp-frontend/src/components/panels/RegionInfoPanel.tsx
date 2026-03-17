@@ -65,6 +65,7 @@ export const RegionInfoPanel: React.FC = () => {
 
   const handleMarkLocation = () => {
     if (!regionId || !regionName || !regionType) return;
+    if (regionType !== 'lga' && regionType !== 'suburb') return;
 
     if (isMarked) {
       removeFavorite(regionId);
@@ -87,7 +88,9 @@ export const RegionInfoPanel: React.FC = () => {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.regionName}>{regionName}</Text>
-          <Text style={styles.regionMeta}>{regionType === 'suburb' ? 'Suburb' : 'LGA'}</Text>
+          <Text style={styles.regionMeta}>
+            {regionType === 'ssc' ? 'SSC' : regionType === 'suburb' ? 'Suburb' : regionType === 'lga' ? 'LGA' : 'Region'}
+          </Text>
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity 

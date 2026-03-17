@@ -1,7 +1,7 @@
 // Climate data types for CLISApp
 export type ClimateLayer = 'pm25' | 'precipitation' | 'uv' | 'humidity' | 'temperature';
 
-export type MapLevel = 'lga' | 'suburb';
+export type MapLevel = 'coarse' | 'ssc';
 
 export interface ClimateDataConfig {
   name: string;

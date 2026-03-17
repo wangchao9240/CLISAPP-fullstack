@@ -1,8 +1,8 @@
 import type { LatLng } from 'react-native-maps';
 import type { FeatureCollection, Feature, Position } from 'geojson';
-import { suburbCollections } from './suburbManifest';
+import { sscCollections } from './sscManifest';
 
-const LGA_COLLECTION = require('../../../assets/geo/boundaries/lga_boundaries.json') as FeatureCollection;
+const COARSE_COLLECTION = require('../../../assets/geo/boundaries/ssc_coarse.json') as FeatureCollection;
 
 export interface PolygonShape {
   outline: LatLng[];
@@ -27,7 +27,7 @@ export const convertGeometryToShapes = (geometry: Feature['geometry']): PolygonS
   }
 
   if (geometry.type === 'Polygon') {
-    const [outer, ...holes] = (geometry.coordinates as Position[][][]).map(convertRing);
+    const [outer, ...holes] = (geometry.coordinates as Position[][]).map(convertRing);
     return [
       {
         outline: outer,
@@ -37,7 +37,7 @@ export const convertGeometryToShapes = (geometry: Feature['geometry']): PolygonS
   }
 
   if (geometry.type === 'MultiPolygon') {
-    return (geometry.coordinates as Position[][][][]).map((polygon) => {
+    return (geometry.coordinates as Position[][][]).map((polygon) => {
       const [outer, ...holes] = polygon.map(convertRing);
       return {
         outline: outer,
@@ -65,9 +65,9 @@ const calculateBbox = (geometry: Feature['geometry']): [number, number, number, 
   };
 
   if (geometry?.type === 'Polygon') {
-    (geometry.coordinates as Position[][][]).forEach(visit);
+    (geometry.coordinates as Position[][]).forEach(visit);
   } else if (geometry?.type === 'MultiPolygon') {
-    (geometry.coordinates as Position[][][][]).forEach((poly) => poly.forEach(visit));
+    (geometry.coordinates as Position[][][]).forEach((poly) => poly.forEach(visit));
   }
 
   return [minLng, minLat, maxLng, maxLat];
@@ -85,23 +85,23 @@ const toBoundaryFeature = (feature: Feature): BoundaryFeature => {
   };
 };
 
-const LGA_FEATURES: BoundaryFeature[] = (LGA_COLLECTION.features ?? []).map(toBoundaryFeature);
-const SUBURB_CACHE: Record<string, BoundaryFeature[]> = {};
+const COARSE_FEATURES: BoundaryFeature[] = (COARSE_COLLECTION.features ?? []).map(toBoundaryFeature);
+const SSC_CACHE: Record<string, BoundaryFeature[]> = {};
 
-export const loadLgaBoundaries = (): BoundaryFeature[] => LGA_FEATURES;
+export const loadCoarseBoundaries = (): BoundaryFeature[] => COARSE_FEATURES;
 
-export const loadSuburbsForLga = (lgaId: string): BoundaryFeature[] => {
-  if (SUBURB_CACHE[lgaId]) {
-    return SUBURB_CACHE[lgaId];
+export const loadSscsForCoarse = (coarseId: string): BoundaryFeature[] => {
+  if (SSC_CACHE[coarseId]) {
+    return SSC_CACHE[coarseId];
   }
 
-  const collection = suburbCollections[lgaId];
+  const collection = sscCollections[coarseId];
   if (!collection) {
-    SUBURB_CACHE[lgaId] = [];
+    SSC_CACHE[coarseId] = [];
     return [];
   }
 
   const features = (collection.features ?? []).map(toBoundaryFeature);
-  SUBURB_CACHE[lgaId] = features;
+  SSC_CACHE[coarseId] = features;
   return features;
 };

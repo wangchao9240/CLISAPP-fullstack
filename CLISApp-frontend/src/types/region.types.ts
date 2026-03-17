@@ -19,7 +19,7 @@ export interface RegionInfoPanelState {
   visible: boolean;
   regionId: string | null;
   regionName: string | null;
-  regionType: 'lga' | 'suburb' | null;
+  regionType: string | null;
   climate: RegionClimateOverview | null;
   loading: boolean;
   error?: string | null;

@@ -136,7 +136,7 @@ export const RegionSearchBar: React.FC<RegionSearchBarProps> = ({ style }) => {
         <TextInput
           style={styles.input}
           value={query}
-          placeholder="Search location or suburb"
+          placeholder="Search location"
           placeholderTextColor="rgba(10, 10, 10, 0.5)"
           onChangeText={handleChangeText}
           accessibilityLabel="Region search"
@@ -162,6 +162,7 @@ export const RegionSearchBar: React.FC<RegionSearchBarProps> = ({ style }) => {
 
 const getDeltasForType = (type: string) => {
   switch (type) {
+    case 'ssc':
     case 'suburb':
       return { latitudeDelta: 0.05, longitudeDelta: 0.05 };
     case 'postcode':
@@ -177,10 +178,10 @@ const getDeltasForType = (type: string) => {
 
 const inferMapLevel = (type: string) => {
   if (type === 'suburb' || type === 'postcode') {
-    return 'suburb' as const;
+    return 'ssc' as const;
   }
   if (type === 'lga') {
-    return 'lga' as const;
+    return 'coarse' as const;
   }
   return undefined;
 };
@@ -318,5 +319,4 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
 });
-
 
