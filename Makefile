@@ -155,6 +155,15 @@ pipeline-manual: ## Run pipeline with explicit manual trigger type
 	}
 	@PIPELINE_TRIGGER=manual $(VENV_PYTHON) scripts/pipeline.py
 
+.PHONY: pipeline-ssc
+pipeline-ssc: ## Compute per-SSC climate averages from latest processed GeoTIFF rasters
+	@command -v python3 >/dev/null 2>&1 || { \
+		echo "  FAIL python3"; \
+		echo "       Action: Install Python 3 (https://python.org/downloads/)"; \
+		exit 1; \
+	}
+	@PYTHONPATH=CLISApp-backend $(VENV_PYTHON) -m data_pipeline.processing.geo.compute_ssc_averages
+
 .PHONY: pipeline-all
 pipeline-all: pipeline ## Alias for 'pipeline' - run all layer pipelines
 

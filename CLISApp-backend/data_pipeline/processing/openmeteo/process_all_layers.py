@@ -280,6 +280,16 @@ async def process_all_layers(
     except Exception as exc:
         logger.warning("Notification check failed (non-fatal): %s", exc, exc_info=True)
 
+    try:
+        from data_pipeline.processing.geo.compute_ssc_averages import (
+            compute_ssc_climate_averages,
+        )
+
+        ssc_result = compute_ssc_climate_averages()
+        logger.info("SSC climate averages: %s", ssc_result)
+    except Exception as exc:
+        logger.warning("SSC climate averaging failed (non-fatal): %s", exc, exc_info=True)
+
     return outputs, execution_log
 
 

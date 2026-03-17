@@ -22,6 +22,7 @@ from app.models.region import (
 )
 from app.services.climate_data_service import ClimateDataService
 from app.services.region_data_loader import RegionDataLoader, RegionRecord, get_loader
+from app.services.ssc_climate_service import SscClimateService
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ class RegionService:
     def __init__(self) -> None:
         self.loader: RegionDataLoader = get_loader()
         self.climate_service = ClimateDataService()
+        self.ssc_climate_service = SscClimateService()
 
     async def search_regions(
         self,
@@ -248,14 +250,47 @@ class RegionService:
     ) -> Optional[Dict[str, ClimateDataPoint]]:
         try:
             centroid = record.geometry.centroid
-            measurements = self.climate_service.get_climate_at(
-                centroid.latitude,
-                centroid.longitude,
-                layers,
+
+            if not record.id.startswith("ssc_"):
+                measurements = self.climate_service.get_climate_at(
+                    centroid.latitude,
+                    centroid.longitude,
+                    layers,
+                )
+                return measurements or None
+
+            requested_layers = (
+                [layer_name for layer_name in layers if isinstance(layer_name, str)]
+                if layers is not None
+                else [layer.value for layer in self.climate_service.available_layers()]
             )
-            if not measurements:
-                return None
-            return measurements
+            ssc_measurements = self.ssc_climate_service.get_climate_for_ssc(record.id) or {}
+            filtered_ssc_measurements = {
+                layer_name: point
+                for layer_name, point in ssc_measurements.items()
+                if layer_name in requested_layers
+            }
+
+            missing_layers = [
+                layer_name
+                for layer_name in requested_layers
+                if layer_name not in filtered_ssc_measurements
+            ]
+            fallback_measurements = (
+                self.climate_service.get_climate_at(
+                    centroid.latitude,
+                    centroid.longitude,
+                    missing_layers,
+                )
+                if missing_layers
+                else {}
+            )
+
+            combined_measurements = {
+                **fallback_measurements,
+                **filtered_ssc_measurements,
+            }
+            return combined_measurements or None
         except Exception as exc:
             logger.warning("Failed to obtain climate data for %s: %s", record.id, exc)
             return None
