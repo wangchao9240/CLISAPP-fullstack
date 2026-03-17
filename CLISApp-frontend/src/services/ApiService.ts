@@ -15,7 +15,7 @@ export interface ApiResponse<T = any> {
 export interface RegionSearchResult {
   id: string;
   name: string;
-  type: 'lga' | 'suburb';
+  type: 'lga' | 'suburb' | 'ssc';
   state: string;
   location: {
     latitude: number;
@@ -28,7 +28,7 @@ export interface RegionSearchResult {
 export interface RegionInfo {
   id: string;
   name: string;
-  type: 'lga' | 'suburb';
+  type: 'lga' | 'suburb' | 'ssc';
   state: string;
   location: {
     latitude: number;
@@ -65,7 +65,7 @@ export interface RegionBoundary {
   properties: {
     id: string;
     name: string;
-    type: 'lga' | 'suburb';
+    type: 'lga' | 'suburb' | 'ssc';
     state: string;
     area_km2?: number;
     parent_region?: string;
@@ -148,7 +148,7 @@ class ApiService {
    */
   async searchRegions(
     query: string,
-    type?: 'lga' | 'suburb',
+    type?: 'lga' | 'suburb' | 'ssc',
     limit: number = 10
   ): Promise<ApiResponse<RegionSearchResult[]>> {
     const params = new URLSearchParams({
@@ -185,7 +185,7 @@ class ApiService {
   async getNearbyRegions(
     lat: number,
     lng: number,
-    level: 'lga' | 'suburb' = 'lga',
+    level: 'lga' | 'suburb' | 'ssc' = 'lga',
     radiusKm: number = 10
   ): Promise<ApiResponse<RegionSearchResult[]>> {
     const params = new URLSearchParams({

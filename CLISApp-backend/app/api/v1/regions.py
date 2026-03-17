@@ -16,7 +16,7 @@ region_service = RegionService()
 @router.get("/regions/search", response_model=List[RegionSearchResult])
 async def search_regions(
     q: str = Query(..., min_length=2, description="Search query (minimum 2 characters)"),
-    type: Optional[Literal["lga", "suburb"]] = Query(None, description="Filter by region type"),
+    type: Optional[Literal["lga", "suburb", "ssc"]] = Query(None, description="Filter by region type"),
     limit: int = Query(10, ge=1, le=50, description="Maximum number of results")
 ):
     """
@@ -105,7 +105,7 @@ async def get_region_climate_data(
 
 @router.get("/regions/bounds/{level}")
 async def get_level_bounds(
-    level: Literal["lga", "suburb"],
+    level: Literal["lga", "suburb", "ssc"],
     state: str = Query("QLD", description="State abbreviation (default: QLD)")
 ):
     """
@@ -135,7 +135,7 @@ async def get_level_bounds(
 async def get_nearby_regions(
     lat: float = Query(..., ge=-90, le=90, description="Latitude"),
     lng: float = Query(..., ge=-180, le=180, description="Longitude"),
-    level: Literal["lga", "suburb"] = Query("lga", description="Geographic level"),
+    level: Literal["lga", "suburb", "ssc"] = Query("lga", description="Geographic level"),
     radius_km: float = Query(10.0, ge=0.1, le=100, description="Search radius in kilometers")
 ):
     """

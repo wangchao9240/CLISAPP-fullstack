@@ -32,7 +32,7 @@ class RegionSearchResult(BaseModel):
     """Search result for region queries"""
     id: str = Field(..., description="Unique region identifier")
     name: str = Field(..., description="Region name")
-    type: Literal["lga", "suburb"] = Field(..., description="Region type")
+    type: Literal["lga", "suburb", "ssc"] = Field(..., description="Region type")
     state: str = Field(..., description="State/territory abbreviation")
     location: Coordinate = Field(..., description="Center coordinate")
     population: Optional[int] = Field(None, description="Population count")
@@ -43,7 +43,7 @@ class RegionResponse(BaseModel):
     """Detailed region information response"""
     id: str = Field(..., description="Unique region identifier")
     name: str = Field(..., description="Official region name")
-    type: Literal["lga", "suburb"] = Field(..., description="Region type")
+    type: Literal["lga", "suburb", "ssc"] = Field(..., description="Region type")
     state: str = Field(..., description="State/territory abbreviation") 
     
     # Geographic data
@@ -90,6 +90,6 @@ class RegionBoundary(BaseModel):
     """Region boundary geometry"""
     region_id: str = Field(..., description="Region identifier")
     name: str = Field(..., description="Region name")
-    type: Literal["lga", "suburb"] = Field(..., description="Region type")
+    type: Literal["lga", "suburb", "ssc"] = Field(..., description="Region type")
     geometry: Dict = Field(..., description="GeoJSON geometry")
     properties: Optional[Dict] = Field(None, description="Additional properties")

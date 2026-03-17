@@ -105,7 +105,7 @@ class RegionService:
         longitude: float,
         include_climate_data: bool = True,
     ) -> Optional[RegionResponse]:
-        """Find the LGA or suburb whose geometry contains the coordinate."""
+        """Find the region (SSC, suburb, or LGA) whose geometry contains the coordinate."""
         point = Point(longitude, latitude)
         record = self._find_region_containing(point)
         logger.debug("Coordinate lookup lat=%s lng=%s -> %s", latitude, longitude, record.id if record else None)
@@ -335,8 +335,8 @@ class RegionService:
         return sorted(sources)
 
     def _find_region_containing(self, point: Point) -> Optional[RegionRecord]:
-        # Prefer suburb level, then fall back to LGA
-        for region_type in ("suburb", "lga"):
+        # Prefer SSC (most specific), then suburb, then LGA
+        for region_type in ("ssc", "suburb", "lga"):
             for record in self._iter_records(region_type):
                 geom = record.geometry.geometry
                 if geom.contains(point) or geom.touches(point):

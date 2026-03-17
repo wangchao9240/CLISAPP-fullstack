@@ -26,5 +26,5 @@ export interface SearchResult {
     latitude: number;
     longitude: number;
   };
-  type: 'lga' | 'suburb' | 'postcode' | 'city';
+  type: 'lga' | 'suburb' | 'ssc' | 'postcode' | 'city';
 }

@@ -15,6 +15,12 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
 import geopandas as gpd
+from data_pipeline.processing.geo.process_boundaries import (
+    SSC_SHP,
+    load_shapefile,
+    prepare_ssc_records,
+    resolve_field_mapping,
+)
 from shapely.geometry import mapping, Polygon, MultiPolygon
 
 from app.models.region import Bounds, Coordinate
@@ -54,11 +60,11 @@ class RegionGeometry:
 
 @dataclass(frozen=True)
 class RegionRecord:
-    """Flattened record for either an LGA or suburb."""
+    """Flattened record for an LGA, suburb, or SSC region."""
 
     id: str
     name: str
-    type: str  # "lga" or "suburb"
+    type: str  # "lga", "suburb", or "ssc"
     state: str
     parent_region: Optional[str]
     postcode: Optional[str]
@@ -73,11 +79,12 @@ class RegionDataLoader:
     def __init__(self) -> None:
         self._lga_records: Dict[str, RegionRecord] = {}
         self._suburb_records: Dict[str, RegionRecord] = {}
+        self._ssc_records: Dict[str, RegionRecord] = {}
         self._load()
 
     @cached_property
     def all_records(self) -> Dict[str, RegionRecord]:
-        combined = {**self._lga_records, **self._suburb_records}
+        combined = {**self._lga_records, **self._suburb_records, **self._ssc_records}
         return combined
 
     def get_records(self, region_type: Optional[str] = None) -> Iterable[RegionRecord]:
@@ -85,6 +92,8 @@ class RegionDataLoader:
             return self._lga_records.values()
         if region_type == "suburb":
             return self._suburb_records.values()
+        if region_type == "ssc":
+            return self._ssc_records.values()
         return self.all_records.values()
 
     def get_record(self, region_id: str) -> Optional[RegionRecord]:
@@ -102,6 +111,16 @@ class RegionDataLoader:
         else:
             self._suburb_records = self._parse_suburb_shapefile()
             logger.info("Loaded %d suburb regions", len(self._suburb_records))
+
+        if not SSC_SHP.exists():
+            logger.warning("SSC shapefile not found at %s", SSC_SHP)
+        else:
+            try:
+                self._ssc_records = self._parse_ssc_shapefile()
+                logger.info("Loaded %d SSC regions", len(self._ssc_records))
+            except Exception as exc:
+                logger.error("Failed to load SSC shapefile: %s", exc, exc_info=True)
+                self._ssc_records = {}
 
     def _parse_lga_shapefile(self) -> Dict[str, RegionRecord]:
         gdf = self._read_shapefile(LGA_SHAPEFILE)
@@ -166,6 +185,37 @@ class RegionDataLoader:
                 },
             )
             records[region_id] = record
+        return records
+
+    def _parse_ssc_shapefile(self) -> Dict[str, RegionRecord]:
+        logger.info("Reading SSC shapefile %s", SSC_SHP)
+        ssc_gdf = load_shapefile(SSC_SHP)
+        field_mapping = resolve_field_mapping(ssc_gdf.columns)
+        prepared = prepare_ssc_records(ssc_gdf, field_mapping)
+
+        records: Dict[str, RegionRecord] = {}
+        for row in prepared.to_dict("records"):
+            ssc_id = str(row["_ssc_id"])
+            name = str(row["_name"])
+            group_id = str(row["_group_id"])
+            parent_name = group_id.replace("group_", "").replace("_", " ").title()
+            geometry = self._build_geometry(row["geometry"])
+            record = RegionRecord(
+                id=ssc_id,
+                name=name,
+                type="ssc",
+                state="QLD",
+                parent_region=parent_name,
+                postcode=None,
+                search_key=name.lower(),
+                geometry=geometry,
+                raw_properties={
+                    "ssc_code": str(row.get("_ssc_code", "")),
+                    "group_id": group_id,
+                    "area_sqkm": geometry.area_km2,
+                },
+            )
+            records[ssc_id] = record
         return records
 
     def _read_shapefile(self, path: Path) -> gpd.GeoDataFrame:
