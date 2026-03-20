@@ -7,7 +7,9 @@ declare module 'react-native-config' {
   export interface NativeConfig {
     GOOGLE_MAPS_API_KEY?: string;
     API_BASE_URL?: string;
+    PRODUCTION_API_URL?: string;
     TILE_SERVER_URL?: string;
+    PRODUCTION_TILE_URL?: string;
     API_TIMEOUT?: string;
     CACHE_ENABLED?: string;
     LOG_LEVEL?: string;
@@ -16,4 +18,3 @@ declare module 'react-native-config' {
   export const Config: NativeConfig;
   export default Config;
 }
-

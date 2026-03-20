@@ -7,10 +7,11 @@ import { ClimateLayer, MapLevel } from '../types/climate.types';
 import { QUEENSLAND_REGION } from '../constants/mapConfig';
 import { DEFAULT_LAYER } from '../constants/climateData';
 import { RegionInfoPanelState, RegionClimateOverview } from '../types/region.types';
+import type { PolygonShape } from '../services/boundaries/BoundaryStore';
 
 interface RegionBoundaryData {
   regionId: string;
-  coordinates: Array<Array<{ latitude: number; longitude: number }>>;
+  polygons: PolygonShape[];
   properties?: any;
 }
 

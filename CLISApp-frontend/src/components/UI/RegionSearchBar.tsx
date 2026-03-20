@@ -14,6 +14,7 @@ import { RegionSearchResult } from '../../services/ApiService';
 import { useMapStore } from '../../store/mapStore';
 import { Region } from '../../types/map.types';
 import { apiService } from '../../services/ApiService';
+import { loadRegionBoundary } from '../../services/boundaries/boundaryLoader';
 
 interface RegionSearchBarProps {
   style?: any;
@@ -23,6 +24,7 @@ export const RegionSearchBar: React.FC<RegionSearchBarProps> = ({ style }) => {
   const [query, setQuery] = useState('');
   const [suppressSearch, setSuppressSearch] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const boundaryRequestIdRef = useRef(0);
   const { data, loading, error, searchRegions, clearResults } = useRegionSearch();
   const { setRegion, setMapLevel, setSelectedRegion, setLoading, openRegionInfo, setRegionInfoLoading, setRegionInfoError, closeRegionInfo, setRegionBoundary } = useMapStore();
 
@@ -52,6 +54,7 @@ export const RegionSearchBar: React.FC<RegionSearchBarProps> = ({ style }) => {
   }, [query, suppressSearch, searchRegions, clearResults]);
 
   const handleSelect = useCallback((item: RegionSearchResult) => {
+    const currentBoundaryRequestId = ++boundaryRequestIdRef.current;
     setSuppressSearch(true);
     setQuery(item.name);
     clearResults();
@@ -98,25 +101,15 @@ export const RegionSearchBar: React.FC<RegionSearchBarProps> = ({ style }) => {
       });
 
     // Fetch region boundary
-    apiService.getRegionBoundary(item.id)
-      .then((response) => {
-        if (response.success && response.data) {
-          const feature = response.data;
-          // Convert GeoJSON coordinates to React Native Maps format
-          const coordinates = convertGeoJSONToMapCoordinates(feature.geometry);
-          setRegionBoundary({
-            regionId: item.id,
-            coordinates,
-            properties: feature.properties,
-          });
-        } else {
-          console.warn('Failed to fetch region boundary:', response.error);
-          setRegionBoundary(null);
+    loadRegionBoundary(item.id)
+      .then((boundary) => {
+        if (boundaryRequestIdRef.current !== currentBoundaryRequestId) {
+          return;
         }
+        setRegionBoundary(boundary);
       })
       .catch((err) => {
         console.error('Failed to load region boundary', err);
-        setRegionBoundary(null);
       });
   }, [setRegion, setMapLevel, clearResults, setSelectedRegion, setLoading, openRegionInfo, setRegionInfoLoading, setRegionInfoError, setRegionBoundary]);
 
@@ -125,6 +118,7 @@ export const RegionSearchBar: React.FC<RegionSearchBarProps> = ({ style }) => {
     setSuppressSearch(false);
     setQuery(text);
     if (text.trim().length === 0) {
+      boundaryRequestIdRef.current += 1;
       closeRegionInfo();
       setRegionBoundary(null);
     }
@@ -194,35 +188,6 @@ const formatRegionMeta = (item: RegionSearchResult) => {
     parts.push(`Population ${item.population.toLocaleString()}`);
   }
   return parts.join(' · ');
-};
-
-/**
- * Convert GeoJSON geometry to React Native Maps coordinate format
- * Handles Polygon and MultiPolygon geometries
- */
-const convertGeoJSONToMapCoordinates = (geometry: any): Array<Array<{ latitude: number; longitude: number }>> => {
-  if (!geometry || !geometry.coordinates) {
-    return [];
-  }
-
-  const convertCoordinatePair = (coord: number[]): { latitude: number; longitude: number } => ({
-    latitude: coord[1],  // GeoJSON is [lng, lat]
-    longitude: coord[0],
-  });
-
-  if (geometry.type === 'Polygon') {
-    // Polygon: coordinates is array of rings, first ring is exterior
-    return geometry.coordinates.map((ring: number[][]) => 
-      ring.map(convertCoordinatePair)
-    );
-  } else if (geometry.type === 'MultiPolygon') {
-    // MultiPolygon: coordinates is array of polygons
-    return geometry.coordinates.flatMap((polygon: number[][][]) =>
-      polygon.map((ring: number[][]) => ring.map(convertCoordinatePair))
-    );
-  }
-
-  return [];
 };
 
 const ResultItem: React.FC<{ item: RegionSearchResult; onPress: (item: RegionSearchResult) => void }> = ({ item, onPress }) => (
@@ -319,4 +284,3 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
 });
-

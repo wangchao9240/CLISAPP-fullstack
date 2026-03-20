@@ -32,7 +32,7 @@ export const useHealthCheck = (): ApiState<HealthStatus> => {
       const response = await apiService.checkHealth();
       
       if (response.success) {
-        setData(response.data);
+        setData(response.data ?? null);
       } else {
         setError(response.error || 'Failed to check health');
       }
@@ -65,7 +65,7 @@ export const useRegionSearch = () => {
 
   const searchRegions = useCallback(async (
     query: string,
-    type?: 'lga' | 'suburb' | 'postcode',
+    type?: 'lga' | 'suburb' | 'postcode' | 'ssc',
     limit: number = 10
   ) => {
     if (query.trim().length < 2) {
@@ -128,7 +128,7 @@ export const useRegionInfo = (regionId: string | null): ApiState<RegionInfo> => 
       const response = await apiService.getRegionInfo(regionId, true);
       
       if (response.success) {
-        setData(response.data);
+        setData(response.data ?? null);
       } else {
         setError(response.error || 'Failed to get region info');
       }

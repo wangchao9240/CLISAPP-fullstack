@@ -148,7 +148,7 @@ class ApiService {
    */
   async searchRegions(
     query: string,
-    type?: 'lga' | 'suburb' | 'ssc',
+    type?: 'lga' | 'suburb' | 'postcode' | 'ssc',
     limit: number = 10
   ): Promise<ApiResponse<RegionSearchResult[]>> {
     const params = new URLSearchParams({

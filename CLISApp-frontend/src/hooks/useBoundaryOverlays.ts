@@ -4,6 +4,7 @@ import { useMapStore } from '../store/mapStore';
 import { BoundaryFeature, loadCoarseBoundaries, loadSscsForCoarse } from '../services/boundaries/BoundaryStore';
 import { point, polygon, multiPolygon } from '@turf/helpers';
 import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
+import { BOUNDARY_COLORS, BOUNDARY_WIDTHS, BOUNDARY_Z_INDEX } from '../constants/boundaryStyles';
 
 export interface MapPolygonOverlay {
   id: string;
@@ -11,15 +12,11 @@ export interface MapPolygonOverlay {
   holes?: { latitude: number; longitude: number }[][];
   strokeColor: string;
   strokeWidth: number;
+  fillColor?: string;
   zIndex: number;
 }
 
-const COARSE_STROKE = 'rgba(96, 96, 96, 0.45)';
-const SSC_STROKE = 'rgba(128, 128, 128, 0.55)';
 const SSC_ZOOM_THRESHOLD = 9;
-const COARSE_BASE_WIDTH = 1;
-const COARSE_ACTIVE_WIDTH = 1.4;
-const SSC_WIDTH = 0.8;
 
 const getZoomLevel = (region: Region): number => {
   const z = Math.log2(360 / region.latitudeDelta);
@@ -44,6 +41,7 @@ const buildPolygonOverlays = (
   strokeColor: string,
   strokeWidth: number,
   zIndex: number,
+  fillColor: string = BOUNDARY_COLORS.UNSELECTED_FILL,
 ): MapPolygonOverlay[] =>
   feature.polygons.map((poly, index) => ({
     id: `${feature.id}-${index}`,
@@ -51,6 +49,7 @@ const buildPolygonOverlays = (
     holes: poly.holes,
     strokeColor,
     strokeWidth,
+    fillColor,
     zIndex,
   }));
 
@@ -67,7 +66,12 @@ const useBoundaryOverlays = () => {
 
     if (zoom < SSC_ZOOM_THRESHOLD) {
       const coarseOverlays = coarseFeatures.flatMap((feature) =>
-        buildPolygonOverlays(feature, COARSE_STROKE, COARSE_BASE_WIDTH, 2)
+        buildPolygonOverlays(
+          feature,
+          BOUNDARY_COLORS.UNSELECTED_STROKE,
+          BOUNDARY_WIDTHS.UNSELECTED,
+          BOUNDARY_Z_INDEX.COARSE
+        )
       );
       setActiveCoarse(null);
       setOverlays(coarseOverlays);
@@ -110,10 +114,20 @@ const useBoundaryOverlays = () => {
 
     const sscFeatures = loadSscsForCoarse(containing.id);
     const sscOverlays = sscFeatures.flatMap((ssc) =>
-      buildPolygonOverlays(ssc, SSC_STROKE, SSC_WIDTH, 3)
+      buildPolygonOverlays(
+        ssc,
+        BOUNDARY_COLORS.UNSELECTED_STROKE,
+        BOUNDARY_WIDTHS.SSC_DETAIL,
+        BOUNDARY_Z_INDEX.SSC
+      )
     );
 
-    const containingOverlays = buildPolygonOverlays(containing, COARSE_STROKE, COARSE_ACTIVE_WIDTH, 4);
+    const containingOverlays = buildPolygonOverlays(
+      containing,
+      BOUNDARY_COLORS.SELECTED_STROKE,
+      BOUNDARY_WIDTHS.SELECTED,
+      BOUNDARY_Z_INDEX.ACTIVE_COARSE
+    );
 
     setActiveCoarse(containing);
     setOverlays([...containingOverlays, ...sscOverlays]);

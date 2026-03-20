@@ -14,6 +14,8 @@ import { Region as MapRegion } from '../../types/map.types';
 import { MapProviderInterface } from '../../services/MapProvider';
 import { fetchRegionInfoByCoordinates, formatClimateOverview } from '../../hooks/useApi';
 import useBoundaryOverlays from '../../hooks/useBoundaryOverlays';
+import { BOUNDARY_COLORS, BOUNDARY_WIDTHS, BOUNDARY_Z_INDEX } from '../../constants/boundaryStyles';
+import { loadRegionBoundary } from '../../services/boundaries/boundaryLoader';
 
 interface OpenStreetMapProps {
   onRegionChange?: (region: Region) => void;
@@ -26,11 +28,24 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
   style,
   providerRef,
 }) => {
-  const { region, activeLayer, mapLevel, regionBoundary, setRegion, setLoading, openRegionInfo, setRegionInfoLoading, setRegionInfoError, setSelectedRegion } = useMapStore();
+  const {
+    region,
+    activeLayer,
+    mapLevel,
+    regionBoundary,
+    setRegion,
+    setLoading,
+    openRegionInfo,
+    setRegionInfoLoading,
+    setRegionInfoError,
+    setSelectedRegion,
+    setRegionBoundary,
+  } = useMapStore();
   const { tileServerUrl } = useSettingsStore();
 
   const mapRef = useRef<MapView>(null);
   const pendingTargetRef = useRef<MapRegion | null>(null);
+  const boundaryRequestIdRef = useRef(0);
 
   useEffect(() => {
     if (providerRef?.current && 'setMapRef' in providerRef.current) {
@@ -46,6 +61,9 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
 
   const handleMapLongPress = useCallback(async (event: any) => {
     const coordinate = event.nativeEvent.coordinate as LatLng;
+    const currentBoundaryRequestId = ++boundaryRequestIdRef.current;
+    setRegionBoundary(null);
+
     try {
       setRegionInfoLoading(true);
       const info = await fetchRegionInfoByCoordinates(coordinate.latitude, coordinate.longitude, true);
@@ -53,7 +71,7 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
         setRegionInfoError('No regional information found for this location');
         return;
       }
-      const overview = formatClimateOverview(info.current_climate, useMapStore.getState().activeLayer);
+      const overview = formatClimateOverview(info.current_climate, activeLayer);
       openRegionInfo({
         regionId: info.id,
         regionName: info.name,
@@ -61,11 +79,24 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
         climate: overview,
       });
       setSelectedRegion(info.id);
+
+      const boundary = await loadRegionBoundary(info.id);
+      if (boundaryRequestIdRef.current !== currentBoundaryRequestId) {
+        return;
+      }
+      setRegionBoundary(boundary);
     } catch (error) {
       console.error('Failed to fetch region info', error);
       setRegionInfoError('Failed to load region information');
     }
-  }, [openRegionInfo, setRegionInfoLoading, setRegionInfoError, setSelectedRegion]);
+  }, [
+    activeLayer,
+    openRegionInfo,
+    setRegionBoundary,
+    setRegionInfoLoading,
+    setRegionInfoError,
+    setSelectedRegion,
+  ]);
 
   const climateTileUrl = `${tileServerUrl}/${activeLayer}/{z}/{x}/{y}.png`;
   const climateTileKey = `${activeLayer}-${mapLevel}-${tileServerUrl}`;
@@ -157,18 +188,19 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
             holes={overlay.holes}
             strokeColor={overlay.strokeColor}
             strokeWidth={overlay.strokeWidth}
-            fillColor="rgba(0,0,0,0)"
+            fillColor={overlay.fillColor ?? BOUNDARY_COLORS.UNSELECTED_FILL}
             zIndex={overlay.zIndex}
           />
         ))}
-        {regionBoundary && regionBoundary.coordinates.map((polygon, idx) => (
+        {regionBoundary && regionBoundary.polygons.map((polygon, idx) => (
           <Polygon
             key={`${regionBoundary.regionId}-${idx}`}
-            coordinates={polygon}
-            strokeColor="#007AFF"
-            strokeWidth={3}
-            fillColor="rgba(0, 122, 255, 0.1)"
-            zIndex={3}
+            coordinates={polygon.outline}
+            holes={polygon.holes}
+            strokeColor={BOUNDARY_COLORS.SELECTED_STROKE}
+            strokeWidth={BOUNDARY_WIDTHS.SELECTED}
+            fillColor={BOUNDARY_COLORS.SELECTED_FILL}
+            zIndex={BOUNDARY_Z_INDEX.SELECTED_REGION}
           />
         ))}
       </MapView>
