@@ -183,7 +183,7 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
         />
         {boundaryOverlays.map((overlay) => (
           <Polygon
-            key={`${overlay.id}-${overlay.zIndex}-${overlay.coordinates.length}`}
+            key={overlay.id}
             coordinates={overlay.coordinates}
             holes={overlay.holes}
             strokeColor={overlay.strokeColor}
