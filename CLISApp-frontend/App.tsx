@@ -8,7 +8,10 @@
 import React, { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { MapScreen } from './src/screens/MapScreen';
+import { PaperProvider } from 'react-native-paper';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { AppNavigator } from './src/navigation/AppNavigator';
+import { theme } from './src/constants/theme';
 import {
   initializeFCM,
   onTokenRefresh,
@@ -33,9 +36,13 @@ function App(): React.JSX.Element {
   }, []);
 
   return (
-    <SafeAreaProvider>
-      <MapScreen />
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <PaperProvider theme={theme}>
+          <AppNavigator />
+        </PaperProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 

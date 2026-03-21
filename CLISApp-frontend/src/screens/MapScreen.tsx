@@ -1,20 +1,50 @@
 // Main map screen implementing FR-001 and FR-002
-import React, { useState } from 'react';
-import { StyleSheet, View, StatusBar, TouchableOpacity, Image, Alert, Platform } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { StyleSheet, View, StatusBar, TouchableOpacity, Image, Alert, Platform, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { UniversalMap } from '../components/Map/UniversalMap';
 import Geolocation from 'react-native-geolocation-service';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 
 import { Legend } from '../components/UI/Legend';
-import { LayerSelector } from '../components/UI/LayerSelector';
 import { RegionSearchBar } from '../components/UI/RegionSearchBar';
 import { useMapStore } from '../store/mapStore';
 
-export const MapScreen: React.FC = () => {
+interface MapScreenProps {
+  isActive?: boolean;
+}
+
+export const MapScreen: React.FC<MapScreenProps> = ({ isActive = true }) => {
   const [legendVisible, setLegendVisible] = useState(false);
   const [locating, setLocating] = useState(false);
-  const { setRegion } = useMapStore();
+  const { setRegion, regionInfo, closeRegionInfo } = useMapStore();
+
+  // Android back button handling (AC #5, #6)
+  const handleBackPress = useCallback(() => {
+    if (!isActive) {
+      return false; // Don't consume back press when tab is hidden
+    }
+    // If region info panel is open, close it first
+    if (regionInfo.visible) {
+      closeRegionInfo();
+      return true;
+    }
+    // If legend popup is open, close it
+    if (legendVisible) {
+      setLegendVisible(false);
+      return true;
+    }
+    // Nothing open, let system handle (exits app)
+    return false;
+  }, [isActive, regionInfo.visible, legendVisible, closeRegionInfo]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !isActive) {
+      return;
+    }
+    const subscription = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
+    return () => subscription.remove();
+  }, [isActive, handleBackPress]);
 
   const requestLocationPermission = async () => {
     try {
@@ -62,7 +92,7 @@ export const MapScreen: React.FC = () => {
 
     try {
       const hasPermission = await requestLocationPermission();
-      
+
       if (!hasPermission) {
         setLocating(false);
         return;
@@ -71,8 +101,7 @@ export const MapScreen: React.FC = () => {
       Geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
-          
-          // Set the map region to user's location with appropriate zoom
+
           setRegion({
             latitude,
             longitude,
@@ -105,44 +134,45 @@ export const MapScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      
+
       <View style={styles.mapContainer}>
         <UniversalMap />
-        
+
         {/* Map controls overlay */}
         <View style={styles.controlsOverlay}>
-          {/* Top Bar with Account Icon, Search Bar, and Layer Selector */}
+          {/* Top Bar: Full-width Search Bar */}
           <View style={styles.topBar}>
-            {/* Account Icon Placeholder (Left) */}
-            <TouchableOpacity style={styles.accountButton}>
-              <View style={styles.accountIconContainer}>
-                {/* Head circle */}
-                <View style={styles.accountIconHead} />
-                {/* Body/shoulders */}
-                <View style={styles.accountIconBody} />
-              </View>
-            </TouchableOpacity>
-
-            {/* Search Bar (Center) */}
             <RegionSearchBar style={styles.searchBar} />
-
-            {/* Layer Selector (Right) */}
-            <LayerSelector style={styles.layerSelectorButton} />
           </View>
 
-          {/* Bottom Controls */}
-          <View style={styles.bottomControls}>
-            {/* Left: Legend Toggle Button */}
+          {/* Right side controls */}
+          <View style={styles.rightControls}>
+            {/* Locate Me Button */}
+            <TouchableOpacity
+              style={[styles.controlButton, locating && styles.controlButtonActive]}
+              onPress={handleLocateMe}
+              disabled={locating}
+            >
+              <Image
+                source={require('../assets/img/locate.png')}
+                style={[styles.controlIcon, locating && styles.controlIconActive]}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* Bottom Left: Legend Toggle */}
+          <View style={styles.bottomLeftControls}>
             <View style={styles.legendContainer}>
               {legendVisible && (
                 <View style={styles.legendPopup}>
                   <Legend layer={undefined as any} />
                 </View>
               )}
-              <TouchableOpacity 
-                style={styles.legendButton}
+              <TouchableOpacity
+                style={styles.controlButton}
                 onPress={() => setLegendVisible(!legendVisible)}
               >
                 <View style={styles.plusIcon}>
@@ -151,19 +181,6 @@ export const MapScreen: React.FC = () => {
                 </View>
               </TouchableOpacity>
             </View>
-
-            {/* Right: Locate Me Button */}
-            <TouchableOpacity 
-              style={[styles.locateButton, locating && styles.locateButtonActive]}
-              onPress={handleLocateMe}
-              disabled={locating}
-            >
-              <Image 
-                source={require('../assets/img/locate.png')}
-                style={[styles.locateIcon, locating && styles.locateIconActive]}
-                resizeMode="contain"
-              />
-            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -186,86 +203,65 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    pointerEvents: 'box-none', // Allow touches to pass through to map
+    pointerEvents: 'box-none',
   },
   topBar: {
     position: 'absolute',
     top: 16,
     left: 16,
     right: 16,
-    flexDirection: 'row',
+    pointerEvents: 'box-none',
+  },
+  searchBar: {
+    pointerEvents: 'auto',
+  },
+  rightControls: {
+    position: 'absolute',
+    right: 16,
+    bottom: 16,
     alignItems: 'center',
     gap: 12,
     pointerEvents: 'box-none',
   },
-  accountButton: {
-    width: 56,
-    height: 56,
+  bottomLeftControls: {
+    position: 'absolute',
+    left: 16,
+    bottom: 16,
+    pointerEvents: 'box-none',
+  },
+  controlButton: {
+    width: 40,
+    height: 40,
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 16,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.05)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowRadius: 4,
     elevation: 3,
     pointerEvents: 'auto',
   },
-  accountIconContainer: {
+  controlButtonActive: {
+    backgroundColor: 'rgba(0, 122, 255, 0.1)',
+  },
+  controlIcon: {
     width: 20,
     height: 20,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    position: 'relative',
+    tintColor: '#333',
   },
-  accountIconHead: {
-    width: 10,
-    height: 10,
-    borderRadius: 100,
-    borderWidth: 1.5,
-    borderColor: '#0A0A0A',
-    backgroundColor: 'transparent',
-    marginBottom: 1,
+  controlIconActive: {
+    tintColor: '#007AFF',
+    opacity: 0.7,
   },
-  accountIconBody: {
-    width: 12,
-    height: 10,
-    borderTopLeftRadius: 6,
-    borderTopRightRadius: 6,
-    borderWidth: 1.5,
-    borderBottomWidth: 0,
-    borderColor: '#0A0A0A',
-    backgroundColor: 'transparent',
-  },
-  searchBar: {
-    flex: 1,
-    pointerEvents: 'auto',
-  },
-  layerSelectorButton: {
-    pointerEvents: 'auto',
-  },
-  // Bottom Controls
-  bottomControls: {
-    position: 'absolute',
-    bottom: 24,
-    left: 16,
-    right: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    pointerEvents: 'box-none',
-  },
-  // Legend Container and Button
   legendContainer: {
     position: 'relative',
     pointerEvents: 'box-none',
   },
   legendPopup: {
     position: 'absolute',
-    bottom: 68,
+    bottom: 52,
     left: 0,
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 16,
@@ -279,22 +275,6 @@ const styles = StyleSheet.create({
     minWidth: 200,
     pointerEvents: 'auto',
   },
-  legendButton: {
-    width: 56,
-    height: 56,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.05)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 3,
-    pointerEvents: 'auto',
-  },
   plusIcon: {
     width: 20,
     height: 20,
@@ -305,44 +285,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 12,
     height: 2,
-    backgroundColor: '#0A0A0A',
+    backgroundColor: '#333',
     borderRadius: 1,
   },
   plusVertical: {
     position: 'absolute',
     width: 2,
     height: 12,
-    backgroundColor: '#0A0A0A',
+    backgroundColor: '#333',
     borderRadius: 1,
-  },
-  // Locate Me Button
-  locateButton: {
-    width: 56,
-    height: 56,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.05)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 3,
-    pointerEvents: 'auto',
-  },
-  locateIcon: {
-    width: 20,
-    height: 20,
-    tintColor: '#0A0A0A',
-  },
-  locateButtonActive: {
-    backgroundColor: 'rgba(0, 122, 255, 0.1)',
-    borderColor: 'rgba(0, 122, 255, 0.3)',
-  },
-  locateIconActive: {
-    tintColor: '#007AFF',
-    opacity: 0.7,
   },
 });
