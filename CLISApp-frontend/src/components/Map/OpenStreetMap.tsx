@@ -47,6 +47,14 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
   const pendingTargetRef = useRef<MapRegion | null>(null);
   const boundaryRequestIdRef = useRef(0);
 
+  const nearlyEqual = (a: number, b: number, eps = 1e-4) => Math.abs(a - b) < eps;
+
+  const regionsEqual = (a: Region, b: Region) =>
+    nearlyEqual(a.latitude, b.latitude) &&
+    nearlyEqual(a.longitude, b.longitude) &&
+    nearlyEqual(a.latitudeDelta, b.latitudeDelta) &&
+    nearlyEqual(a.longitudeDelta, b.longitudeDelta);
+
   useEffect(() => {
     if (providerRef?.current && 'setMapRef' in providerRef.current) {
       (providerRef.current as any).setMapRef(mapRef.current);
@@ -54,7 +62,10 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
   }, [providerRef]);
 
   const handleRegionChangeComplete = useCallback((newRegion: Region) => {
-    setRegion(newRegion);
+    const currentRegion = useMapStore.getState().region;
+    if (!regionsEqual(currentRegion, newRegion)) {
+      setRegion(newRegion);
+    }
     onRegionChange?.(newRegion);
     setLoading(false);
   }, [setRegion, onRegionChange, setLoading]);
@@ -119,8 +130,6 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
     const lon = Math.max(Math.min(r.longitude, QUEENSLAND_BOUNDS.east), QUEENSLAND_BOUNDS.west);
     return { ...r, latitude: lat, longitude: lon };
   };
-
-  const nearlyEqual = (a: number, b: number, eps = 1e-4) => Math.abs(a - b) < eps;
 
   const needSnapBack = (a: RNRegion, b: RNRegion): boolean => {
     return !(nearlyEqual(a.latitude, b.latitude) && nearlyEqual(a.longitude, b.longitude));

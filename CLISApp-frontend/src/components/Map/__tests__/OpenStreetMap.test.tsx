@@ -131,6 +131,37 @@ describe('OpenStreetMap', () => {
     }));
   });
 
+  it('does not write unchanged region values back to the store on region change complete', () => {
+    const setRegion = jest.fn();
+    const setLoading = jest.fn();
+
+    mockUseMapStore.mockReturnValue({
+      region: baseRegion,
+      activeLayer: 'temperature',
+      mapLevel: 'coarse',
+      regionBoundary: null,
+      setRegion,
+      setLoading,
+      openRegionInfo: jest.fn(),
+      setRegionInfoLoading: jest.fn(),
+      setRegionInfoError: jest.fn(),
+      setSelectedRegion: jest.fn(),
+      setRegionBoundary: jest.fn(),
+    });
+    (mockUseMapStore as any).getState = jest.fn(() => ({
+      region: baseRegion,
+    }));
+
+    create(<OpenStreetMap />);
+
+    act(() => {
+      mockMapViewProps.onRegionChangeComplete(baseRegion);
+    });
+
+    expect(setRegion).not.toHaveBeenCalled();
+    expect(setLoading).toHaveBeenCalledWith(false);
+  });
+
   it('clears and reloads the selected region boundary on long press', async () => {
     const setRegionBoundary = jest.fn();
     const setRegionInfoLoading = jest.fn();

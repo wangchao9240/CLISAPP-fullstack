@@ -25,11 +25,9 @@ export const UniversalMap: React.FC<UniversalMapProps> = ({
   onMapReady,
 }) => {
   const { 
-    region, 
     activeLayer, 
     mapLevel, 
     setRegion, 
-    selectedRegionId,
     setError,
     setSelectedRegion,
     openRegionInfo,
@@ -101,12 +99,6 @@ export const UniversalMap: React.FC<UniversalMapProps> = ({
       mapProviderRef.current.setTileLayer(activeLayer, mapLevel);
     }
   }, [activeLayer, mapLevel]);
-
-  useEffect(() => {
-    if (selectedRegionId) {
-      mapProviderRef.current?.animateToRegion(region, 600);
-    }
-  }, [selectedRegionId, region]);
 
   const renderMap = () => {
     switch (mapProvider) {
