@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert, Modal, Pressable } fro
 import { useMapStore } from '../../store/mapStore';
 import { CLIMATE_LAYERS } from '../../constants/climateData';
 import { ClimateLayer } from '../../types/climate.types';
+import { trackEvent } from '../../services/telemetryService';
 
 export const LAYERS: Array<{ key: ClimateLayer; label: string; emoji: string; available: boolean }> = [
   { key: 'pm25', label: 'PM2.5', emoji: '💨', available: true },
@@ -25,6 +26,7 @@ export const LayerSelector: React.FC<{ style?: any; onSelected?: () => void }> =
     }
     setActiveLayer(key as any);
     setMenuVisible(false);
+    void trackEvent('layer_change', { layer: key });
     onSelected?.();
   };
 

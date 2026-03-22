@@ -12,7 +12,8 @@ import logging
 from pathlib import Path
 
 from app.core.config import settings
-from app.api.v1 import tiles, regions, health
+from app.api.v1 import tiles, regions, health, telemetry
+from app.services.telemetry_service import init_db
 
 # Configure logging
 logging.basicConfig(
@@ -82,6 +83,7 @@ def create_application() -> FastAPI:
     app.include_router(health.router, prefix="/api/v1", tags=["health"])
     app.include_router(tiles.router, prefix="/api/v1", tags=["tiles"])
     app.include_router(regions.router, prefix="/api/v1", tags=["regions"])
+    app.include_router(telemetry.router, prefix="/api/v1", tags=["telemetry"])
 
     # Legacy health endpoint for backward compatibility (Phase 1)
     # This provides compatibility with Phase 0 frontend that uses /health
@@ -148,6 +150,8 @@ def create_application() -> FastAPI:
         # Ensure data directories exist
         settings.create_data_directories()
         logger.info("Data directories initialized")
+        init_db()
+        logger.info("Telemetry DB initialized")
 
     @app.on_event("shutdown")
     async def shutdown_event():

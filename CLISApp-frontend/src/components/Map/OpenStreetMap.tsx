@@ -16,6 +16,7 @@ import { fetchRegionInfoByCoordinates, formatClimateOverview } from '../../hooks
 import useBoundaryOverlays from '../../hooks/useBoundaryOverlays';
 import { BOUNDARY_COLORS, BOUNDARY_WIDTHS, BOUNDARY_Z_INDEX } from '../../constants/boundaryStyles';
 import { loadRegionBoundary } from '../../services/boundaries/boundaryLoader';
+import { trackEvent } from '../../services/telemetryService';
 
 interface OpenStreetMapProps {
   onRegionChange?: (region: Region) => void;
@@ -90,6 +91,7 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
         climate: overview,
       });
       setSelectedRegion(info.id);
+      void trackEvent('region_select', { region_type: info.type });
 
       const boundary = await loadRegionBoundary(info.id);
       if (boundaryRequestIdRef.current !== currentBoundaryRequestId) {
