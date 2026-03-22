@@ -43,6 +43,7 @@ describe('RegionSearchBar', () => {
   });
 
   it('ignores stale boundary responses from earlier search selections', async () => {
+    const openRegionInfo = jest.fn();
     const setRegionBoundary = jest.fn();
 
     mockUseMapStore.mockReturnValue({
@@ -50,7 +51,7 @@ describe('RegionSearchBar', () => {
       setMapLevel: jest.fn(),
       setSelectedRegion: jest.fn(),
       setLoading: jest.fn(),
-      openRegionInfo: jest.fn(),
+      openRegionInfo,
       setRegionInfoLoading: jest.fn(),
       setRegionInfoError: jest.fn(),
       closeRegionInfo: jest.fn(),
@@ -90,6 +91,10 @@ describe('RegionSearchBar', () => {
         id: 'region-info',
         name: 'Region Info',
         type: 'lga',
+        location: {
+          latitude: -27.47,
+          longitude: 153.02,
+        },
         current_climate: { temperature: { value: 23, unit: 'C' } },
       },
     });
@@ -176,6 +181,14 @@ describe('RegionSearchBar', () => {
       regionId: 'region-newer',
       polygons: secondPolygons,
       properties: { source: 'newer' },
+    });
+    expect(openRegionInfo).toHaveBeenCalledWith({
+      regionId: 'region-info',
+      regionName: 'Region Info',
+      regionType: 'lga',
+      climate: { summary: 'Test climate' },
+      latitude: -27.47,
+      longitude: 153.02,
     });
   });
 });

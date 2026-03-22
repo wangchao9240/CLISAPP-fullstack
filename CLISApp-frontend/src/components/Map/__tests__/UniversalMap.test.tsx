@@ -1,8 +1,13 @@
 import React from 'react';
+import { Animated } from 'react-native';
 import { act, create } from 'react-test-renderer';
 
 jest.mock('../../../store/mapStore', () => ({
   useMapStore: jest.fn(),
+}));
+
+jest.mock('../../../store/favoritesStore', () => ({
+  useFavoritesStore: jest.fn(),
 }));
 
 jest.mock('../../../store/settingsStore', () => ({
@@ -12,6 +17,11 @@ jest.mock('../../../store/settingsStore', () => ({
 jest.mock('../../../hooks/useApi', () => ({
   fetchRegionInfoByCoordinates: jest.fn(),
   formatClimateOverview: jest.fn(),
+}));
+
+jest.mock('../../../constants/climateData', () => ({
+  formatBadgeText: jest.fn(() => 'Test badge'),
+  getActiveClimateStat: jest.fn(() => null),
 }));
 
 jest.mock('../OpenStreetMap', () => ({
@@ -24,13 +34,54 @@ jest.mock('../../../services/MapProvider', () => ({
   },
 }));
 
+jest.mock('@gorhom/bottom-sheet', () => {
+  const React = require('react');
+
+  const BottomSheetModal = React.forwardRef((props: any, ref: any) => {
+    React.useImperativeHandle(ref, () => ({
+      present: jest.fn(),
+      dismiss: jest.fn(),
+    }));
+
+    return <>{props.children}</>;
+  });
+
+  return {
+    BottomSheetModal,
+    BottomSheetView: ({ children }: any) => <>{children}</>,
+    BottomSheetScrollView: ({ children }: any) => <>{children}</>,
+    BottomSheetBackdrop: () => null,
+  };
+});
+
+jest.mock('react-native-paper', () => {
+  const React = require('react');
+
+  return {
+    Snackbar: (props: any) => React.createElement('Snackbar', props, props.children),
+  };
+});
+
+jest.mock('react-native-vector-icons/MaterialCommunityIcons', () => {
+  const React = require('react');
+
+  return (props: any) => React.createElement('Icon', props);
+});
+
 const { UniversalMap } = require('../UniversalMap');
+const { HealthBottomSheet } = require('../../panels/HealthBottomSheet');
 const { useMapStore } = require('../../../store/mapStore');
+const { useFavoritesStore } = require('../../../store/favoritesStore');
+const { Snackbar } = require('react-native-paper');
 const { useSettingsStore } = require('../../../store/settingsStore');
+const { fetchRegionInfoByCoordinates, formatClimateOverview } = require('../../../hooks/useApi');
 const { MapProviderFactory } = require('../../../services/MapProvider');
 
 const mockUseMapStore = useMapStore as jest.Mock;
+const mockUseFavoritesStore = useFavoritesStore as jest.Mock;
 const mockUseSettingsStore = useSettingsStore as jest.Mock;
+const mockFetchRegionInfoByCoordinates = fetchRegionInfoByCoordinates as jest.Mock;
+const mockFormatClimateOverview = formatClimateOverview as jest.Mock;
 const mockCreateProvider = MapProviderFactory.create as jest.Mock;
 
 describe('UniversalMap', () => {
@@ -76,5 +127,188 @@ describe('UniversalMap', () => {
     });
 
     expect(provider.animateToRegion).not.toHaveBeenCalled();
+  });
+
+  it('passes fetched coordinates into region info on long press', async () => {
+    const provider = {
+      animateToRegion: jest.fn(),
+      setTileLayer: jest.fn(),
+      onRegionChange: jest.fn(),
+      onLongPress: jest.fn(),
+      destroy: jest.fn(),
+    };
+    const openRegionInfo = jest.fn();
+    const setRegionInfoLoading = jest.fn();
+    const setSelectedRegion = jest.fn();
+
+    mockUseSettingsStore.mockReturnValue({
+      mapProvider: 'react-native-maps',
+      tileServerUrl: 'https://tiles.example.com',
+    });
+    mockUseMapStore.mockReturnValue({
+      activeLayer: 'temperature',
+      mapLevel: 'ssc',
+      setRegion: jest.fn(),
+      setError: jest.fn(),
+      setSelectedRegion,
+      openRegionInfo,
+      setRegionInfoLoading,
+      setRegionInfoError: jest.fn(),
+    });
+    mockCreateProvider.mockReturnValue(provider);
+    mockFetchRegionInfoByCoordinates.mockResolvedValue({
+      id: 'ssc-1',
+      name: 'Fortitude Valley',
+      type: 'ssc',
+      location: {
+        latitude: -27.457,
+        longitude: 153.034,
+      },
+      current_climate: { temperature: 29 },
+    });
+    mockFormatClimateOverview.mockReturnValue({ summary: 'Hot' });
+
+    await act(async () => {
+      create(<UniversalMap />);
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      await provider.onLongPress.mock.calls[0][0]({
+        latitude: -27.47,
+        longitude: 153.02,
+      });
+    });
+
+    expect(setRegionInfoLoading).toHaveBeenCalledWith(true);
+    expect(openRegionInfo).toHaveBeenCalledWith({
+      regionId: 'ssc-1',
+      regionName: 'Fortitude Valley',
+      regionType: 'ssc',
+      climate: { summary: 'Hot' },
+      latitude: -27.457,
+      longitude: 153.034,
+    });
+    expect(setSelectedRegion).toHaveBeenCalledWith('ssc-1');
+  });
+});
+
+describe('HealthBottomSheet', () => {
+  let springStart: jest.Mock;
+  let springSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    springStart = jest.fn((callback?: () => void) => callback?.());
+    springSpy = jest
+      .spyOn(Animated, 'spring')
+      .mockReturnValue({ start: springStart } as any);
+  });
+
+  afterEach(() => {
+    springSpy.mockRestore();
+  });
+
+  it('allows saving SSC regions as favorites with coordinates and animation', () => {
+    const addFavorite = jest.fn();
+    const removeFavorite = jest.fn();
+    const restoreFavorite = jest.fn();
+
+    mockUseMapStore.mockReturnValue({
+      regionInfo: {
+        visible: true,
+        regionId: 'ssc-1',
+        regionName: 'Fortitude Valley',
+        regionType: 'ssc',
+        climate: null,
+        latitude: -27.457,
+        longitude: 153.034,
+        loading: false,
+        error: null,
+      },
+      activeLayer: 'temperature',
+      closeRegionInfo: jest.fn(),
+    });
+    mockUseFavoritesStore.mockReturnValue({
+      isFavorite: jest.fn(() => false),
+      addFavorite,
+      removeFavorite,
+      restoreFavorite,
+    });
+
+    const renderer = create(<HealthBottomSheet />);
+    const favoriteButton = renderer.root.find((node) => typeof node.props.onPress === 'function');
+
+    act(() => {
+      favoriteButton.props.onPress();
+    });
+
+    expect(favoriteButton.props.disabled).not.toBe(true);
+    expect(addFavorite).toHaveBeenCalledWith({
+      regionId: 'ssc-1',
+      regionName: 'Fortitude Valley',
+      regionType: 'ssc',
+      latitude: -27.457,
+      longitude: 153.034,
+      timestamp: expect.any(String),
+    });
+    expect(springSpy).toHaveBeenCalled();
+    expect(springStart).toHaveBeenCalled();
+  });
+
+  it('shows an undo snackbar when removing a favorite and restores the saved item', () => {
+    const favorite = {
+      regionId: 'ssc-1',
+      regionName: 'Fortitude Valley',
+      regionType: 'ssc',
+      latitude: -27.457,
+      longitude: 153.034,
+      timestamp: '2026-03-22T04:00:00.000Z',
+    };
+    const removeFavorite = jest.fn();
+    const restoreFavorite = jest.fn();
+
+    mockUseMapStore.mockReturnValue({
+      regionInfo: {
+        visible: true,
+        regionId: favorite.regionId,
+        regionName: favorite.regionName,
+        regionType: favorite.regionType,
+        climate: null,
+        latitude: favorite.latitude,
+        longitude: favorite.longitude,
+        loading: false,
+        error: null,
+      },
+      activeLayer: 'temperature',
+      closeRegionInfo: jest.fn(),
+    });
+    mockUseFavoritesStore.mockReturnValue({
+      isFavorite: jest.fn(() => true),
+      addFavorite: jest.fn(),
+      removeFavorite,
+      restoreFavorite,
+      getFavorite: jest.fn(() => favorite),
+    });
+
+    const renderer = create(<HealthBottomSheet />);
+    const favoriteButton = renderer.root.find((node) => typeof node.props.onPress === 'function');
+
+    act(() => {
+      favoriteButton.props.onPress();
+    });
+
+    const snackbar = renderer.root.findByType(Snackbar);
+
+    expect(removeFavorite).toHaveBeenCalledWith('ssc-1');
+    expect(snackbar.props.visible).toBe(true);
+    expect(snackbar.props.children).toBe('Deleted');
+    expect(snackbar.props.action.label).toBe('Undo');
+
+    act(() => {
+      snackbar.props.action.onPress();
+    });
+
+    expect(restoreFavorite).toHaveBeenCalledWith(favorite);
   });
 });

@@ -205,6 +205,10 @@ describe('OpenStreetMap', () => {
       id: 'region-2',
       name: 'Region Two',
       type: 'lga',
+      location: {
+        latitude: -27.47,
+        longitude: 153.02,
+      },
       current_climate: { temperature: 22 },
     });
     mockFormatClimateOverview.mockReturnValue({ summary: 'Warm' });
@@ -231,6 +235,14 @@ describe('OpenStreetMap', () => {
     });
 
     expect(setRegionBoundary).toHaveBeenNthCalledWith(1, null);
+    expect(openRegionInfo).toHaveBeenCalledWith({
+      regionId: 'region-2',
+      regionName: 'Region Two',
+      regionType: 'lga',
+      climate: { summary: 'Warm' },
+      latitude: -27.47,
+      longitude: 153.02,
+    });
     expect(mockGetRegionBoundary).toHaveBeenCalledWith('region-2');
     expect(mockConvertGeometryToShapes).toHaveBeenCalledWith(geometry);
     expect(setRegionBoundary).toHaveBeenLastCalledWith({
@@ -290,12 +302,20 @@ describe('OpenStreetMap', () => {
         id: 'region-older',
         name: 'Older Region',
         type: 'lga',
+        location: {
+          latitude: -27.47,
+          longitude: 153.02,
+        },
         current_climate: { temperature: 20 },
       })
       .mockResolvedValueOnce({
         id: 'region-newer',
         name: 'Newer Region',
         type: 'lga',
+        location: {
+          latitude: -27.57,
+          longitude: 152.92,
+        },
         current_climate: { temperature: 24 },
       });
     mockFormatClimateOverview.mockReturnValue({ summary: 'Test climate' });
