@@ -47,6 +47,7 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
   const mapRef = useRef<MapView>(null);
   const pendingTargetRef = useRef<MapRegion | null>(null);
   const boundaryRequestIdRef = useRef(0);
+  const isAnimatingRef = useRef(false);
 
   const nearlyEqual = (a: number, b: number, eps = 1e-4) => Math.abs(a - b) < eps;
 
@@ -63,6 +64,11 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
   }, [providerRef]);
 
   const handleRegionChangeComplete = useCallback((newRegion: Region) => {
+    if (isAnimatingRef.current) {
+      // Skip store update during programmatic animation to prevent feedback loop
+      setLoading(false);
+      return;
+    }
     const currentRegion = useMapStore.getState().region;
     if (!regionsEqual(currentRegion, newRegion)) {
       setRegion(newRegion);
@@ -155,6 +161,19 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
     }
   }, [providerRef, handleMapLongPress]);
 
+  useEffect(() => {
+    // Animate to new region when store changes externally (favorites, search, locate-me)
+    // Skip if this is the initial render
+    if (!mapRef.current) return;
+    isAnimatingRef.current = true;
+    mapRef.current.animateToRegion(region as any, 600);
+    // Reset flag after animation completes
+    const timer = setTimeout(() => {
+      isAnimatingRef.current = false;
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [region.latitude, region.longitude, region.latitudeDelta, region.longitudeDelta]);
+
   const boundaryOverlays = useBoundaryOverlays();
 
   const handleMapPress = useCallback(() => {
@@ -170,7 +189,6 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
         ref={mapRef}
         style={styles.map}
         initialRegion={region}
-        region={clampToBounds(region as any)}
         onPress={handleMapPress}
         onRegionChangeComplete={(r) => {
           const clamped = clampToBounds(r as any);

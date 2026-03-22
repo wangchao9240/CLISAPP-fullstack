@@ -33,6 +33,15 @@ jest.mock('../../../services/boundaries/BoundaryStore', () => ({
   convertGeometryToShapes: jest.fn(),
 }));
 
+jest.mock('react-native-device-info', () => ({
+  getVersion: jest.fn(() => '1.0.0'),
+  getUniqueId: jest.fn(() => 'test-device-id'),
+}));
+
+jest.mock('../../../services/telemetryService', () => ({
+  trackEvent: jest.fn(),
+}));
+
 jest.mock('react-native-maps', () => {
   const React = require('react');
 

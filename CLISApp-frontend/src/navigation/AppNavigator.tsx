@@ -26,7 +26,7 @@ export const AppNavigator: React.FC = () => {
         <MapScreen isActive={isMapTab} />
       </View>
       <View style={[styles.sceneContainer, isMapTab && styles.hidden]}>
-        <FavoritesScreen />
+        <FavoritesScreen onNavigateToMap={() => setIndex(0)} />
       </View>
       <BottomNavigation.Bar
         navigationState={{ index, routes }}

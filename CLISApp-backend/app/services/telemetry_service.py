@@ -1,6 +1,7 @@
 import sqlite3
 import time
 import logging
+from collections import OrderedDict
 from pathlib import Path
 from app.models.telemetry import TelemetryEvent
 
@@ -10,7 +11,43 @@ DB_PATH = Path("./data/telemetry.db")
 
 # Rate limiting: max requests per IP per minute
 RATE_LIMIT = 30
-_rate_store: dict[str, list[float]] = {}
+# Maximum unique client IDs tracked (prevents unbounded memory growth)
+MAX_RATE_STORE_ENTRIES = 10_000
+
+
+class BoundedRateStore:
+    """LRU-evicting rate store that caps the number of tracked clients."""
+
+    def __init__(self, max_entries: int = MAX_RATE_STORE_ENTRIES):
+        self._store: OrderedDict[str, list[float]] = OrderedDict()
+        self._max_entries = max_entries
+
+    def is_rate_limited(self, client_id: str) -> bool:
+        now = time.time()
+        window = now - 60
+        timestamps = [t for t in self._store.get(client_id, []) if t > window]
+
+        if client_id in self._store:
+            self._store.move_to_end(client_id)
+        self._store[client_id] = timestamps
+
+        if len(timestamps) >= RATE_LIMIT:
+            return True
+
+        self._store[client_id].append(now)
+
+        # Evict oldest entries if over capacity
+        while len(self._store) > self._max_entries:
+            self._store.popitem(last=False)
+
+        return False
+
+
+_rate_store = BoundedRateStore()
+
+
+def is_rate_limited(client_id: str) -> bool:
+    return _rate_store.is_rate_limited(client_id)
 
 
 def init_db():
@@ -31,18 +68,8 @@ def init_db():
         conn.commit()
 
 
-def is_rate_limited(client_id: str) -> bool:
-    now = time.time()
-    window = now - 60
-    timestamps = [t for t in _rate_store.get(client_id, []) if t > window]
-    _rate_store[client_id] = timestamps
-    if len(timestamps) >= RATE_LIMIT:
-        return True
-    _rate_store[client_id].append(now)
-    return False
-
-
 def insert_event(event: TelemetryEvent) -> int:
+    """Synchronous DB insert — must be called from a thread pool, not the event loop."""
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.execute(
             """INSERT INTO telemetry
