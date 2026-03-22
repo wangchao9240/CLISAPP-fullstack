@@ -1,15 +1,15 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { StyleSheet, View, Text, Pressable, Platform } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, StyleSheet, View, Text, Pressable, Platform } from 'react-native';
 import {
   BottomSheetModal,
-  BottomSheetView,
   BottomSheetScrollView,
   BottomSheetBackdrop,
 } from '@gorhom/bottom-sheet';
+import { Snackbar } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { formatBadgeText, getActiveClimateStat } from '../../constants/climateData';
 import { useMapStore } from '../../store/mapStore';
-import { useFavoritesStore } from '../../store/favoritesStore';
+import { FavoriteLocation, useFavoritesStore } from '../../store/favoritesStore';
 
 const SNAP_POINTS = ['40%', '60%', '85%'];
 const CATEGORY_BADGE_COLORS: Record<string, { bg: string; text: string }> = {
@@ -23,6 +23,9 @@ const DEFAULT_BADGE_COLORS = { bg: '#FFDBC7', text: '#733600' };
 
 export const HealthBottomSheet: React.FC = () => {
   const bottomSheetRef = useRef<BottomSheetModal>(null);
+  const heartScale = useRef(new Animated.Value(1)).current;
+  const [deletedFavorite, setDeletedFavorite] = useState<FavoriteLocation | null>(null);
+  const [isSnackbarVisible, setIsSnackbarVisible] = useState(false);
 
   const {
     regionInfo,
@@ -30,11 +33,29 @@ export const HealthBottomSheet: React.FC = () => {
     closeRegionInfo,
   } = useMapStore();
 
-  const { isFavorite, addFavorite, removeFavorite } = useFavoritesStore();
+  const { isFavorite, addFavorite, restoreFavorite, removeFavorite, getFavorite } = useFavoritesStore();
 
   const snapPoints = useMemo(() => SNAP_POINTS, []);
   const activeStat = getActiveClimateStat(regionInfo.climate, activeLayer);
   const badgeColors = CATEGORY_BADGE_COLORS[activeStat?.category ?? ''] ?? DEFAULT_BADGE_COLORS;
+
+  const animateHeart = useCallback(() => {
+    Animated.spring(heartScale, {
+      toValue: 0.7,
+      useNativeDriver: true,
+      speed: 20,
+      bounciness: 10,
+    }).start(() => {
+      Animated.spring(heartScale, {
+        toValue: 1,
+        useNativeDriver: true,
+        speed: 20,
+        bounciness: 10,
+      }).start();
+    });
+  }, [heartScale]);
+
+  const prevRegionIdRef = useRef(regionInfo.regionId);
 
   // Sync visibility with store
   useEffect(() => {
@@ -42,8 +63,19 @@ export const HealthBottomSheet: React.FC = () => {
       bottomSheetRef.current?.present();
     } else {
       bottomSheetRef.current?.dismiss();
+      setIsSnackbarVisible(false);
+      setDeletedFavorite(null);
     }
   }, [regionInfo.visible]);
+
+  // Clear stale snackbar when region changes
+  useEffect(() => {
+    if (prevRegionIdRef.current !== regionInfo.regionId) {
+      setIsSnackbarVisible(false);
+      setDeletedFavorite(null);
+      prevRegionIdRef.current = regionInfo.regionId;
+    }
+  }, [regionInfo.regionId]);
 
   const handleSheetChanges = useCallback(
     (index: number) => {
@@ -54,31 +86,68 @@ export const HealthBottomSheet: React.FC = () => {
     [regionInfo.visible, closeRegionInfo]
   );
 
-  const handleFavoriteToggle = () => {
-    if (!regionInfo.regionId || !regionInfo.regionName || !regionInfo.regionType) return;
-
-    // Validate regionType matches favoritesStore contract
-    const validTypes = ['lga', 'suburb'] as const;
-    const regionType = regionInfo.regionType as string;
-    if (!validTypes.includes(regionType as any)) {
-      return; // Skip saving if regionType is not supported
+  const handleFavoriteToggle = useCallback(() => {
+    if (!regionInfo.regionId || !regionInfo.regionName) {
+      return;
     }
 
+    animateHeart();
+
     if (isFavorite(regionInfo.regionId)) {
+      const favoriteToRemove =
+        getFavorite(regionInfo.regionId) ?? {
+          regionId: regionInfo.regionId,
+          regionName: regionInfo.regionName,
+          regionType: (regionInfo.regionType || 'ssc') as FavoriteLocation['regionType'],
+          latitude: regionInfo.latitude ?? undefined,
+          longitude: regionInfo.longitude ?? undefined,
+          timestamp: new Date().toISOString(),
+        };
+
+      setDeletedFavorite(favoriteToRemove);
       removeFavorite(regionInfo.regionId);
+      setIsSnackbarVisible(true);
     } else {
+      setIsSnackbarVisible(false);
+      setDeletedFavorite(null);
       addFavorite({
         regionId: regionInfo.regionId,
         regionName: regionInfo.regionName,
-        regionType: regionType as 'lga' | 'suburb',
+        regionType: (regionInfo.regionType || 'ssc') as FavoriteLocation['regionType'],
+        latitude: regionInfo.latitude ?? undefined,
+        longitude: regionInfo.longitude ?? undefined,
         timestamp: new Date().toISOString(),
       });
     }
-  };
+  }, [
+    addFavorite,
+    animateHeart,
+    getFavorite,
+    isFavorite,
+    regionInfo.latitude,
+    regionInfo.longitude,
+    regionInfo.regionId,
+    regionInfo.regionName,
+    regionInfo.regionType,
+    removeFavorite,
+  ]);
 
-  // Check if current region type supports favorites
-  const canFavorite = regionInfo.regionType === 'lga' || regionInfo.regionType === 'suburb';
-  const isFav = regionInfo.regionId && canFavorite ? isFavorite(regionInfo.regionId) : false;
+  const handleUndoFavorite = useCallback(() => {
+    if (!deletedFavorite) {
+      return;
+    }
+
+    restoreFavorite(deletedFavorite);
+    setDeletedFavorite(null);
+    setIsSnackbarVisible(false);
+  }, [deletedFavorite, restoreFavorite]);
+
+  const handleDismissSnackbar = useCallback(() => {
+    setIsSnackbarVisible(false);
+    setDeletedFavorite(null);
+  }, []);
+
+  const isFav = regionInfo.regionId ? isFavorite(regionInfo.regionId) : false;
 
   const renderBackdrop = useCallback(
     (props: any) => (
@@ -111,12 +180,14 @@ export const HealthBottomSheet: React.FC = () => {
             <Text style={styles.regionName}>
               {regionInfo.regionName || 'Selected Region'}
             </Text>
-            <Pressable onPress={handleFavoriteToggle} style={styles.favoriteButton} disabled={!canFavorite}>
-              <Icon
-                name={isFav ? 'cards-heart' : 'cards-heart-outline'}
-                size={24}
-                color={isFav ? '#ba1a1a' : canFavorite ? '#414752' : '#C1C6D4'}
-              />
+            <Pressable onPress={handleFavoriteToggle} style={styles.favoriteButton}>
+              <Animated.View style={[styles.favoriteIconContainer, { transform: [{ scale: heartScale }] }]}>
+                <Icon
+                  name={isFav ? 'cards-heart' : 'cards-heart-outline'}
+                  size={24}
+                  color={isFav ? '#ba1a1a' : '#414752'}
+                />
+              </Animated.View>
             </Pressable>
           </View>
           <View style={[styles.riskBadge, { backgroundColor: badgeColors.bg }]}>
@@ -228,6 +299,18 @@ export const HealthBottomSheet: React.FC = () => {
           <Text style={[styles.footerText, styles.footerTextBold]}>Last updated: 2 hours ago</Text>
         </View>
       </BottomSheetScrollView>
+      <Snackbar
+        visible={isSnackbarVisible}
+        onDismiss={handleDismissSnackbar}
+        duration={3000}
+        wrapperStyle={styles.snackbarWrapper}
+        action={{
+          label: 'Undo',
+          onPress: handleUndoFavorite,
+        }}
+      >
+        Deleted
+      </Snackbar>
     </BottomSheetModal>
   );
 };
@@ -277,6 +360,10 @@ const styles = StyleSheet.create({
   },
   favoriteButton: {
     padding: 4,
+  },
+  favoriteIconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   riskBadge: {
     backgroundColor: '#FFDBC7',
@@ -475,5 +562,8 @@ const styles = StyleSheet.create({
   },
   footerTextBold: {
     fontWeight: '500',
+  },
+  snackbarWrapper: {
+    bottom: 100,
   },
 });

@@ -10,7 +10,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export interface FavoriteLocation {
   regionId: string;
   regionName: string;
-  regionType: 'lga' | 'suburb';
+  regionType: 'lga' | 'suburb' | 'ssc';
+  latitude?: number;
+  longitude?: number;
   timestamp: string; // When it was marked
   notes?: string; // Optional user notes for next semester
 }
@@ -20,6 +22,7 @@ interface FavoritesState {
   
   // Actions
   addFavorite: (location: FavoriteLocation) => void;
+  restoreFavorite: (location: FavoriteLocation) => void;
   removeFavorite: (regionId: string) => void;
   updateFavoriteNotes: (regionId: string, notes: string) => void;
   isFavorite: (regionId: string) => boolean;
@@ -28,6 +31,20 @@ interface FavoritesState {
   getFavoriteCount: () => number;
 }
 
+const FAVORITES_STORE_VERSION = 1;
+
+const appendFavorite = (
+  favorites: FavoriteLocation[],
+  location: FavoriteLocation
+): FavoriteLocation[] => {
+  const exists = favorites.some((favorite) => favorite.regionId === location.regionId);
+  if (exists) {
+    return favorites;
+  }
+
+  return [...favorites, location];
+};
+
 export const useFavoritesStore = create<FavoritesState>()(
   persist(
     (set, get) => ({
@@ -35,16 +52,15 @@ export const useFavoritesStore = create<FavoritesState>()(
 
       addFavorite: (location) =>
         set((state) => {
-          // Prevent duplicates
-          const exists = state.favorites.some((fav) => fav.regionId === location.regionId);
-          if (exists) {
-            return state;
-          }
-
           return {
-            favorites: [...state.favorites, location],
+            favorites: appendFavorite(state.favorites, location),
           };
         }),
+
+      restoreFavorite: (location) =>
+        set((state) => ({
+          favorites: appendFavorite(state.favorites, location),
+        })),
 
       removeFavorite: (regionId) =>
         set((state) => ({
@@ -78,6 +94,21 @@ export const useFavoritesStore = create<FavoritesState>()(
     {
       name: 'clisapp-favorites',
       storage: createJSONStorage(() => AsyncStorage),
+      version: FAVORITES_STORE_VERSION,
+      migrate: (persistedState: any) => {
+        if (!persistedState) {
+          return { favorites: [] };
+        }
+
+        return {
+          ...persistedState,
+          favorites: Array.isArray(persistedState.favorites)
+            ? persistedState.favorites.map((favorite: FavoriteLocation) => ({
+                ...favorite,
+              }))
+            : [],
+        };
+      },
     }
   )
 );

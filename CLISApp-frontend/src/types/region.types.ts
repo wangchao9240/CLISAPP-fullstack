@@ -20,6 +20,8 @@ export interface RegionInfoPanelState {
   regionId: string | null;
   regionName: string | null;
   regionType: string | null;
+  latitude: number | null;
+  longitude: number | null;
   climate: RegionClimateOverview | null;
   loading: boolean;
   error?: string | null;

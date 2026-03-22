@@ -37,6 +37,8 @@ interface MapState {
     regionId: string;
     regionName: string;
     regionType: string;
+    latitude: number;
+    longitude: number;
     climate: RegionClimateOverview | null;
   }) => void;
   closeRegionInfo: () => void;
@@ -64,6 +66,8 @@ export const useMapStore = create<MapState>()(
         regionId: null,
         regionName: null,
         regionType: null,
+        latitude: null,
+        longitude: null,
         climate: null,
         loading: false,
         error: null,
@@ -81,13 +85,15 @@ export const useMapStore = create<MapState>()(
       setLoading: (loading) => set({ isLoading: loading }),
       setTileLoadingProgress: (progress) => set({ tileLoadingProgress: progress }),
       setError: (error) => set({ error, isLoading: false }),
-      openRegionInfo: ({ regionId, regionName, regionType, climate }) =>
+      openRegionInfo: ({ regionId, regionName, regionType, latitude, longitude, climate }) =>
         set({
           regionInfo: {
             visible: true,
             regionId,
             regionName,
             regionType,
+            latitude,
+            longitude,
             climate,
             loading: false,
             error: null,
@@ -100,6 +106,8 @@ export const useMapStore = create<MapState>()(
             regionId: null,
             regionName: null,
             regionType: null,
+            latitude: null,
+            longitude: null,
             climate: null,
             loading: false,
             error: null,
@@ -137,6 +145,8 @@ export const useMapStore = create<MapState>()(
             regionId: null,
             regionName: null,
             regionType: null,
+            latitude: null,
+            longitude: null,
             climate: null,
             loading: false,
             error: null,

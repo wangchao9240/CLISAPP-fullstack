@@ -92,6 +92,8 @@ export const RegionSearchBar: React.FC<RegionSearchBarProps> = ({ style }) => {
           regionId: info.id,
           regionName: info.name,
           regionType: info.type,
+          latitude: info.location.latitude,
+          longitude: info.location.longitude,
           climate: overview,
         });
       })
