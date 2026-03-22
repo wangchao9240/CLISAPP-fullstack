@@ -18,23 +18,13 @@ interface LayerBarProps {
 export const LayerBar: React.FC<LayerBarProps> = ({ visible = true }) => {
   const { activeLayer, setActiveLayer, regionInfo } = useMapStore();
 
-  const bottomAnim = useRef(new Animated.Value(regionInfo.visible ? 136 : 80)).current;
-
-  useEffect(() => {
-    Animated.spring(bottomAnim, {
-      toValue: regionInfo.visible ? 136 : 80,
-      useNativeDriver: false,
-      friction: 8,
-      tension: 50,
-    }).start();
-  }, [regionInfo.visible, bottomAnim]);
 
   if (!visible) {
     return null;
   }
 
   return (
-    <Animated.View style={[styles.container, { bottom: bottomAnim }]}>
+    <Animated.View style={[styles.container, { bottom: 0 }]}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}

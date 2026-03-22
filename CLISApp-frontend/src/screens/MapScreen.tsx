@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
   rightControls: {
     position: 'absolute',
     right: 16,
-    bottom: 16,
+    bottom: 80,
     alignItems: 'center',
     gap: 12,
     pointerEvents: 'box-none',
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
   bottomLeftControls: {
     position: 'absolute',
     left: 16,
-    bottom: 16,
+    bottom: 80,
     pointerEvents: 'box-none',
   },
   controlButton: {
