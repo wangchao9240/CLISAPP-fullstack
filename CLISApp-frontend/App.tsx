@@ -10,7 +10,9 @@ import { Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { PaperProvider } from 'react-native-paper';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { AppNavigator } from './src/navigation/AppNavigator';
+import { HealthBottomSheet } from './src/components/panels/HealthBottomSheet';
 import { theme } from './src/constants/theme';
 import {
   initializeFCM,
@@ -39,7 +41,10 @@ function App(): React.JSX.Element {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <PaperProvider theme={theme}>
-          <AppNavigator />
+          <BottomSheetModalProvider>
+            <AppNavigator />
+            <HealthBottomSheet />
+          </BottomSheetModalProvider>
         </PaperProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

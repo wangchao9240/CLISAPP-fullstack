@@ -144,6 +144,13 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
 
   const boundaryOverlays = useBoundaryOverlays();
 
+  const handleMapPress = useCallback(() => {
+    const { regionInfo, closeRegionInfo } = useMapStore.getState();
+    if (regionInfo.visible) {
+      closeRegionInfo();
+    }
+  }, []);
+
   return (
     <View style={[styles.container, style]}>
       <MapView
@@ -151,6 +158,7 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
         style={styles.map}
         initialRegion={region}
         region={clampToBounds(region as any)}
+        onPress={handleMapPress}
         onRegionChangeComplete={(r) => {
           const clamped = clampToBounds(r as any);
           if (needSnapBack(r as any, clamped)) {

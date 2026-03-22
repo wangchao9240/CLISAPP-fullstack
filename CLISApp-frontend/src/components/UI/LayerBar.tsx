@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Animated } from 'react-native';
 import { useMapStore } from '../../store/mapStore';
 import { ClimateLayer } from '../../types/climate.types';
 
@@ -11,11 +11,30 @@ const LAYERS: ReadonlyArray<{ key: ClimateLayer; label: string }> = [
   { key: 'precipitation', label: 'Precip' },
 ] as const;
 
-export const LayerBar: React.FC = () => {
-  const { activeLayer, setActiveLayer } = useMapStore();
+interface LayerBarProps {
+  visible?: boolean;
+}
+
+export const LayerBar: React.FC<LayerBarProps> = ({ visible = true }) => {
+  const { activeLayer, setActiveLayer, regionInfo } = useMapStore();
+
+  const bottomAnim = useRef(new Animated.Value(regionInfo.visible ? 136 : 80)).current;
+
+  useEffect(() => {
+    Animated.spring(bottomAnim, {
+      toValue: regionInfo.visible ? 136 : 80,
+      useNativeDriver: false,
+      friction: 8,
+      tension: 50,
+    }).start();
+  }, [regionInfo.visible, bottomAnim]);
+
+  if (!visible) {
+    return null;
+  }
 
   return (
-    <View style={styles.container}>
+    <Animated.View style={[styles.container, { bottom: bottomAnim }]}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -39,15 +58,21 @@ export const LayerBar: React.FC = () => {
           );
         })}
       </ScrollView>
-    </View>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
+    position: 'absolute',
+    bottom: 80, // Right above the 80px bottom nav by default
+    left: 0,
+    right: 0,
     height: 56,
     backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'center',
+    zIndex: 1000,
+    elevation: 1000,
   },
   scrollContent: {
     paddingHorizontal: 16,

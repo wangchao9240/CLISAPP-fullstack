@@ -4,7 +4,6 @@ import { BottomNavigation } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { MapScreen } from '../screens/MapScreen';
 import { FavoritesScreen } from '../screens/FavoritesScreen';
-import { LayerBar } from '../components/UI/LayerBar';
 
 export const AppNavigator: React.FC = () => {
   const [index, setIndex] = useState(0);
@@ -29,7 +28,6 @@ export const AppNavigator: React.FC = () => {
       <View style={[styles.sceneContainer, isMapTab && styles.hidden]}>
         <FavoritesScreen />
       </View>
-      {isMapTab && <LayerBar />}
       <BottomNavigation.Bar
         navigationState={{ index, routes }}
         onTabPress={({ route }) => {

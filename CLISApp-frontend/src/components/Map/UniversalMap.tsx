@@ -6,7 +6,6 @@ import { useSettingsStore } from '../../store/settingsStore';
 import { MapProviderFactory, MapProviderInterface } from '../../services/MapProvider';
 import { fetchRegionInfoByCoordinates, formatClimateOverview } from '../../hooks/useApi';
 import { Region } from '../../types/map.types';
-import { RegionInfoPanel } from '../panels/RegionInfoPanel';
 
 // OpenStreetMap implementation
 import { OpenStreetMap } from './OpenStreetMap';
@@ -137,7 +136,6 @@ export const UniversalMap: React.FC<UniversalMapProps> = ({
   return (
     <View style={[styles.container, style]}>
       {renderMap()}
-      <RegionInfoPanel />
     </View>
   );
 };

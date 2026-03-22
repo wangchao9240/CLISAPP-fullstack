@@ -8,6 +8,7 @@ import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 
 import { Legend } from '../components/UI/Legend';
 import { RegionSearchBar } from '../components/UI/RegionSearchBar';
+import { LayerBar } from '../components/UI/LayerBar';
 import { useMapStore } from '../store/mapStore';
 
 interface MapScreenProps {
@@ -18,6 +19,13 @@ export const MapScreen: React.FC<MapScreenProps> = ({ isActive = true }) => {
   const [legendVisible, setLegendVisible] = useState(false);
   const [locating, setLocating] = useState(false);
   const { setRegion, regionInfo, closeRegionInfo } = useMapStore();
+
+  // Close sheet when tab becomes inactive (fixes sheet leak to other tabs)
+  useEffect(() => {
+    if (!isActive && regionInfo.visible) {
+      closeRegionInfo();
+    }
+  }, [isActive, regionInfo.visible, closeRegionInfo]);
 
   // Android back button handling (AC #5, #6)
   const handleBackPress = useCallback(() => {
@@ -183,6 +191,9 @@ export const MapScreen: React.FC<MapScreenProps> = ({ isActive = true }) => {
             </View>
           </View>
         </View>
+
+        {/* Layer Bar - above bottom nav */}
+        <LayerBar visible={isActive} />
       </View>
     </SafeAreaView>
   );
