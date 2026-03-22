@@ -1,5 +1,6 @@
 // Climate data layer configurations
 import { ClimateDataConfig, ClimateLayer } from '../types/climate.types';
+import { RegionClimateOverview, RegionClimateStat } from '../types/region.types';
 
 const PM25_COLOR_SCALE = ['#00ff00', '#ffff00', '#ff6600', '#ff0000', '#800080'];
 const PM25_DEFAULT_THRESHOLDS = [0, 12, 35, 55, 150];
@@ -83,4 +84,33 @@ export const getPrecipitationThresholds = () => precipitationThresholds;
 
 export const resetPrecipitationThresholdsToDefault = () => {
   setPrecipitationThresholds([...PRECIP_DEFAULT_THRESHOLDS]);
+};
+
+export const LAYER_CATEGORY_SUFFIX: Record<ClimateLayer, string> = {
+  pm25: 'Air Quality',
+  uv: 'UV Exposure',
+  temperature: 'Temperature',
+  humidity: 'Humidity',
+  precipitation: 'Rainfall',
+};
+
+export const getActiveClimateStat = (
+  climate: RegionClimateOverview | null,
+  activeLayer: ClimateLayer,
+): RegionClimateStat | null => {
+  if (!climate) return null;
+  if (climate.primary?.layer === activeLayer) return climate.primary;
+  return climate.secondary.find((stat) => stat.layer === activeLayer) ?? null;
+};
+
+export const formatBadgeText = (
+  value: number | undefined,
+  unit: string | undefined,
+  category: string | undefined,
+  layer: ClimateLayer,
+): string => {
+  const suffix = LAYER_CATEGORY_SUFFIX[layer];
+  const categoryLabel = category ? `${category} ${suffix}` : suffix;
+  if (value === undefined || unit === undefined) return categoryLabel;
+  return `${value} ${unit} / ${categoryLabel}`;
 };

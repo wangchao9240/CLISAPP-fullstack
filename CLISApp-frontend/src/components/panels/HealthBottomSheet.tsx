@@ -7,10 +7,19 @@ import {
   BottomSheetBackdrop,
 } from '@gorhom/bottom-sheet';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { formatBadgeText, getActiveClimateStat } from '../../constants/climateData';
 import { useMapStore } from '../../store/mapStore';
 import { useFavoritesStore } from '../../store/favoritesStore';
 
 const SNAP_POINTS = ['40%', '60%', '85%'];
+const CATEGORY_BADGE_COLORS: Record<string, { bg: string; text: string }> = {
+  'Very Low': { bg: '#C8E6C9', text: '#1B5E20' },
+  Low: { bg: '#DCEDC8', text: '#33691E' },
+  Moderate: { bg: '#FFDBC7', text: '#733600' },
+  High: { bg: '#FFCCBC', text: '#BF360C' },
+  'Very High': { bg: '#FFCDD2', text: '#B71C1C' },
+};
+const DEFAULT_BADGE_COLORS = { bg: '#FFDBC7', text: '#733600' };
 
 export const HealthBottomSheet: React.FC = () => {
   const bottomSheetRef = useRef<BottomSheetModal>(null);
@@ -24,6 +33,8 @@ export const HealthBottomSheet: React.FC = () => {
   const { isFavorite, addFavorite, removeFavorite } = useFavoritesStore();
 
   const snapPoints = useMemo(() => SNAP_POINTS, []);
+  const activeStat = getActiveClimateStat(regionInfo.climate, activeLayer);
+  const badgeColors = CATEGORY_BADGE_COLORS[activeStat?.category ?? ''] ?? DEFAULT_BADGE_COLORS;
 
   // Sync visibility with store
   useEffect(() => {
@@ -108,8 +119,10 @@ export const HealthBottomSheet: React.FC = () => {
               />
             </Pressable>
           </View>
-          <View style={styles.riskBadge}>
-            <Text style={styles.riskBadgeText}>Moderate Air Quality</Text>
+          <View style={[styles.riskBadge, { backgroundColor: badgeColors.bg }]}>
+            <Text style={[styles.riskBadgeText, { color: badgeColors.text }]}>
+              {formatBadgeText(activeStat?.value, activeStat?.unit, activeStat?.category, activeLayer)}
+            </Text>
           </View>
         </View>
 
