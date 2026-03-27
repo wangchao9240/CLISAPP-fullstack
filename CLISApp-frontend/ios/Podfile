@@ -48,5 +48,16 @@ target 'CLISApp' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    # Fix CpHeader build failure with Xcode 26+ for RNGestureHandler
+    installer.pods_project.targets.each do |target|
+      if target.name == 'RNGestureHandler'
+        target.build_phases.each do |phase|
+          if phase.display_name.include?('Copy Headers')
+            phase.files.clear
+          end
+        end
+      end
+    end
   end
 end

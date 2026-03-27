@@ -147,7 +147,8 @@ def test_get_region_by_id_returns_ssc() -> None:
     assert result.name == "Sunnybank Hills"
 
 
-def test_coordinate_lookup_prefers_ssc() -> None:
+def test_coordinate_lookup_finds_ssc() -> None:
+    """Coordinate lookup resolves to SSC — the single boundary source."""
     service = _make_service(
         {
             "ssc": [
@@ -156,22 +157,6 @@ def test_coordinate_lookup_prefers_ssc() -> None:
                     "Sunnybank Hills",
                     "ssc",
                     parent_region="Brisbane City",
-                )
-            ],
-            "suburb": [
-                _make_record(
-                    "suburb_20161",
-                    "Sunnybank Hills",
-                    "suburb",
-                    parent_region="Brisbane City",
-                )
-            ],
-            "lga": [
-                _make_record(
-                    "lga_31000",
-                    "Brisbane City",
-                    "lga",
-                    geometry=box(152.9, -27.7, 153.2, -27.4),
                 )
             ],
         }
@@ -184,6 +169,28 @@ def test_coordinate_lookup_prefers_ssc() -> None:
     assert result is not None
     assert result.id == "ssc_20161"
     assert result.type == "ssc"
+
+
+def test_coordinate_lookup_returns_none_outside_boundaries() -> None:
+    """Coordinates outside all SSC boundaries return None."""
+    service = _make_service(
+        {
+            "ssc": [
+                _make_record(
+                    "ssc_20161",
+                    "Sunnybank Hills",
+                    "ssc",
+                    parent_region="Brisbane City",
+                )
+            ],
+        }
+    )
+
+    result = asyncio.run(
+        service.get_region_by_coordinates(-20.0, 140.0, include_climate_data=False)
+    )
+
+    assert result is None
 
 
 def test_search_performance_under_one_second() -> None:

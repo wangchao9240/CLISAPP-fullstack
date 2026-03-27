@@ -1,18 +1,20 @@
-"""Region data loader for Queensland LGA and suburb boundaries.
+"""Region data loader for Queensland boundaries.
 
-This module reads the shapefiles that were downloaded into
-`data_pipeline/data/raw/geo/` and exposes lightweight in-memory
-representations that the RegionService can use for search, lookup and
-boundary queries.
+This module reads the SSC (State Suburb Code) shapefile — the single
+boundary data source for the entire application — and exposes lightweight
+in-memory representations that the RegionService can use for search,
+lookup and boundary queries.
+
+The SSC shapefile contains 2,894 merged suburb-level boundaries covering
+all of Queensland.  LGA groupings are derived from the SSC parent_region
+field rather than from separate LGA/suburb shapefiles.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from functools import cached_property
 import logging
-from pathlib import Path
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, Optional
 
 import geopandas as gpd
 from data_pipeline.processing.geo.process_boundaries import (
@@ -26,20 +28,6 @@ from shapely.geometry import mapping, Polygon, MultiPolygon
 from app.models.region import Bounds, Coordinate
 
 logger = logging.getLogger(__name__)
-
-
-DATA_ROOT = (
-    Path(__file__)
-    .resolve()
-    .parents[2]
-    / "data_pipeline"
-    / "data"
-    / "raw"
-    / "geo"
-)
-
-LGA_SHAPEFILE = DATA_ROOT / "LGA_boundaries" / "Local_Government_Areas.shp"
-SUBURB_SHAPEFILE = DATA_ROOT / "suburb_boundaries" / "Locality_Boundaries.shp"
 
 AUSTRALIA_ALBERS_EPSG = 3577  # suitable for area calculations
 WGS84_EPSG = 4326
@@ -60,11 +48,11 @@ class RegionGeometry:
 
 @dataclass(frozen=True)
 class RegionRecord:
-    """Flattened record for an LGA, suburb, or SSC region."""
+    """Flattened record for an SSC region."""
 
     id: str
     name: str
-    type: str  # "lga", "suburb", or "ssc"
+    type: str  # "ssc"
     state: str
     parent_region: Optional[str]
     postcode: Optional[str]
@@ -74,44 +62,21 @@ class RegionRecord:
 
 
 class RegionDataLoader:
-    """Loads Queensland LGA and suburb shapefiles into memory."""
+    """Loads Queensland SSC boundaries (single data source) into memory."""
 
     def __init__(self) -> None:
-        self._lga_records: Dict[str, RegionRecord] = {}
-        self._suburb_records: Dict[str, RegionRecord] = {}
         self._ssc_records: Dict[str, RegionRecord] = {}
         self._load()
 
-    @cached_property
-    def all_records(self) -> Dict[str, RegionRecord]:
-        combined = {**self._lga_records, **self._suburb_records, **self._ssc_records}
-        return combined
-
     def get_records(self, region_type: Optional[str] = None) -> Iterable[RegionRecord]:
-        if region_type == "lga":
-            return self._lga_records.values()
-        if region_type == "suburb":
-            return self._suburb_records.values()
-        if region_type == "ssc":
-            return self._ssc_records.values()
-        return self.all_records.values()
+        if region_type is not None and region_type != "ssc":
+            return iter([])
+        return self._ssc_records.values()
 
     def get_record(self, region_id: str) -> Optional[RegionRecord]:
-        return self.all_records.get(region_id)
+        return self._ssc_records.get(region_id)
 
     def _load(self) -> None:
-        if not LGA_SHAPEFILE.exists():
-            logger.warning("LGA shapefile not found at %s", LGA_SHAPEFILE)
-        else:
-            self._lga_records = self._parse_lga_shapefile()
-            logger.info("Loaded %d LGA regions", len(self._lga_records))
-
-        if not SUBURB_SHAPEFILE.exists():
-            logger.warning("Suburb shapefile not found at %s", SUBURB_SHAPEFILE)
-        else:
-            self._suburb_records = self._parse_suburb_shapefile()
-            logger.info("Loaded %d suburb regions", len(self._suburb_records))
-
         if not SSC_SHP.exists():
             logger.warning("SSC shapefile not found at %s", SSC_SHP)
         else:
@@ -121,71 +86,6 @@ class RegionDataLoader:
             except Exception as exc:
                 logger.error("Failed to load SSC shapefile: %s", exc, exc_info=True)
                 self._ssc_records = {}
-
-    def _parse_lga_shapefile(self) -> Dict[str, RegionRecord]:
-        gdf = self._read_shapefile(LGA_SHAPEFILE)
-        records: Dict[str, RegionRecord] = {}
-        for row in gdf.itertuples(index=False):
-            lga_code = getattr(row, "lga_code", None)
-            if not lga_code:
-                continue
-            region_id = f"lga_{str(lga_code)}"
-            name = getattr(row, "lga", None) or getattr(row, "adminarean", "")
-            geometry = self._build_geometry(row.geometry)
-            record = RegionRecord(
-                id=region_id,
-                name=name.title(),
-                type="lga",
-                state="QLD",
-                parent_region=None,
-                postcode=None,
-                search_key=name.lower(),
-                geometry=geometry,
-                raw_properties={
-                    "admintypen": getattr(row, "admintypen", None),
-                    "adminarean": getattr(row, "adminarean", None),
-                    "abbrev_nam": getattr(row, "abbrev_nam", None),
-                    "lga_code": lga_code,
-                    "area_sqkm": geometry.area_km2,
-                },
-            )
-            records[region_id] = record
-        return records
-
-    def _parse_suburb_shapefile(self) -> Dict[str, RegionRecord]:
-        gdf = self._read_shapefile(SUBURB_SHAPEFILE)
-        records: Dict[str, RegionRecord] = {}
-        for row in gdf.itertuples(index=False):
-            loc_code = getattr(row, "loc_code", None)
-            if loc_code is None:
-                continue
-            raw_name = getattr(row, "locality", None)
-            if not raw_name:
-                continue
-            name = str(raw_name).title()
-            region_id = f"suburb_{str(loc_code)}"
-            parent_lga_raw = getattr(row, "lga", None)
-            parent_lga = str(parent_lga_raw).title() if parent_lga_raw else None
-            geometry = self._build_geometry(row.geometry)
-            record = RegionRecord(
-                id=region_id,
-                name=name,
-                type="suburb",
-                state="QLD",
-                parent_region=parent_lga,
-                postcode=None,
-                search_key=name.lower(),
-                geometry=geometry,
-                raw_properties={
-                    "admintypen": getattr(row, "admintypen", None),
-                    "adminarean": getattr(row, "adminarean", None),
-                    "loc_code": loc_code,
-                    "lga": parent_lga,
-                    "area_sqkm": geometry.area_km2,
-                },
-            )
-            records[region_id] = record
-        return records
 
     def _parse_ssc_shapefile(self) -> Dict[str, RegionRecord]:
         logger.info("Reading SSC shapefile %s", SSC_SHP)
@@ -217,14 +117,6 @@ class RegionDataLoader:
             )
             records[ssc_id] = record
         return records
-
-    def _read_shapefile(self, path: Path) -> gpd.GeoDataFrame:
-        logger.info("Reading shapefile %s", path)
-        gdf = gpd.read_file(path)
-        if gdf.crs is None or gdf.crs.to_epsg() != WGS84_EPSG:
-            gdf = gdf.to_crs(epsg=WGS84_EPSG)
-        gdf = gdf.dropna(subset=["geometry"])
-        return gdf
 
     def _build_geometry(self, geom: Polygon | MultiPolygon) -> RegionGeometry:
         centroid = geom.centroid

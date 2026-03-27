@@ -173,7 +173,7 @@ const getDeltasForType = (type: string) => {
 };
 
 const inferMapLevel = (type: string) => {
-  if (type === 'suburb' || type === 'postcode') {
+  if (type === 'ssc' || type === 'suburb' || type === 'postcode') {
     return 'ssc' as const;
   }
   if (type === 'lga') {

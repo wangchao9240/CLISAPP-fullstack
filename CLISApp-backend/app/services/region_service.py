@@ -335,10 +335,8 @@ class RegionService:
         return sorted(sources)
 
     def _find_region_containing(self, point: Point) -> Optional[RegionRecord]:
-        # Prefer SSC (most specific), then suburb, then LGA
-        for region_type in ("ssc", "suburb", "lga"):
-            for record in self._iter_records(region_type):
-                geom = record.geometry.geometry
-                if geom.contains(point) or geom.touches(point):
-                    return record
+        for record in self._iter_records("ssc"):
+            geom = record.geometry.geometry
+            if geom.contains(point) or geom.touches(point):
+                return record
         return None
