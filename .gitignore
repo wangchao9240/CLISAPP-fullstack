@@ -99,6 +99,7 @@ yarn-error.log
 
 # Testing
 /coverage
+**/coverage
 
 # Metro bundler
 .metro-health-check*
