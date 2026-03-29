@@ -5,18 +5,34 @@
 
 import React, { useCallback, useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
-import MapView, { UrlTile, LatLng, Region as RNRegion, Polygon } from 'react-native-maps';
+import MapView, {
+  UrlTile,
+  LatLng,
+  Region as RNRegion,
+  Polygon,
+} from 'react-native-maps';
 import { useMapStore } from '../../store/mapStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { Region } from '../../types/map.types';
-import { TILE_CONFIG, LAYER_OPACITY, DEFAULT_OSM_TILE_SERVER, QUEENSLAND_BOUNDS } from '../../constants/mapConfig';
+import {
+  TILE_CONFIG,
+  LAYER_OPACITY,
+  DEFAULT_OSM_TILE_SERVER,
+  QUEENSLAND_BOUNDS,
+} from '../../constants/mapConfig';
 import { Region as MapRegion } from '../../types/map.types';
 import { MapProviderInterface } from '../../services/MapProvider';
-import { fetchRegionInfoByCoordinates, formatClimateOverview } from '../../hooks/useApi';
+import {
+  fetchRegionInfoByCoordinates,
+  formatClimateOverview,
+} from '../../hooks/useApi';
 import useBoundaryOverlays from '../../hooks/useBoundaryOverlays';
-import { BOUNDARY_COLORS, BOUNDARY_WIDTHS, BOUNDARY_Z_INDEX } from '../../constants/boundaryStyles';
+import {
+  BOUNDARY_COLORS,
+  BOUNDARY_WIDTHS,
+  BOUNDARY_Z_INDEX,
+} from '../../constants/boundaryStyles';
 import { loadRegionBoundary } from '../../services/boundaries/boundaryLoader';
-import { trackEvent } from '../../services/telemetryService';
 
 interface OpenStreetMapProps {
   onRegionChange?: (region: Region) => void;
@@ -24,8 +40,8 @@ interface OpenStreetMapProps {
   providerRef?: React.MutableRefObject<MapProviderInterface | null>;
 }
 
-export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({ 
-  onRegionChange, 
+export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
+  onRegionChange,
   style,
   providerRef,
 }) => {
@@ -49,7 +65,8 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
   const boundaryRequestIdRef = useRef(0);
   const isAnimatingRef = useRef(false);
 
-  const nearlyEqual = (a: number, b: number, eps = 1e-4) => Math.abs(a - b) < eps;
+  const nearlyEqual = (a: number, b: number, eps = 1e-4) =>
+    Math.abs(a - b) < eps;
 
   const regionsEqual = (a: Region, b: Region) =>
     nearlyEqual(a.latitude, b.latitude) &&
@@ -63,65 +80,77 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
     }
   }, [providerRef]);
 
-  const handleRegionChangeComplete = useCallback((newRegion: Region) => {
-    if (isAnimatingRef.current) {
-      // Skip store update during programmatic animation to prevent feedback loop
+  const handleRegionChangeComplete = useCallback(
+    (newRegion: Region) => {
+      if (isAnimatingRef.current) {
+        // Skip store update during programmatic animation to prevent feedback loop
+        setLoading(false);
+        return;
+      }
+      const currentRegion = useMapStore.getState().region;
+      if (!regionsEqual(currentRegion, newRegion)) {
+        setRegion(newRegion);
+      }
+      onRegionChange?.(newRegion);
       setLoading(false);
-      return;
-    }
-    const currentRegion = useMapStore.getState().region;
-    if (!regionsEqual(currentRegion, newRegion)) {
-      setRegion(newRegion);
-    }
-    onRegionChange?.(newRegion);
-    setLoading(false);
-  }, [setRegion, onRegionChange, setLoading]);
+    },
+    [setRegion, onRegionChange, setLoading],
+  );
 
-  const handleMapLongPress = useCallback(async (event: any) => {
-    const coordinate = event.nativeEvent.coordinate as LatLng;
-    const currentBoundaryRequestId = ++boundaryRequestIdRef.current;
-    setRegionBoundary(null);
+  const handleMapLongPress = useCallback(
+    async (event: any) => {
+      const coordinate = event.nativeEvent.coordinate as LatLng;
+      const currentBoundaryRequestId = ++boundaryRequestIdRef.current;
+      setRegionBoundary(null);
 
-    try {
-      setRegionInfoLoading(true);
-      const info = await fetchRegionInfoByCoordinates(coordinate.latitude, coordinate.longitude, true);
-      if (!info) {
-        setRegionInfoError('No regional information found for this location');
-        return;
+      try {
+        setRegionInfoLoading(true);
+        const info = await fetchRegionInfoByCoordinates(
+          coordinate.latitude,
+          coordinate.longitude,
+          true,
+        );
+        if (!info) {
+          setRegionInfoError('No regional information found for this location');
+          return;
+        }
+        const overview = formatClimateOverview(
+          info.current_climate,
+          activeLayer,
+        );
+        openRegionInfo({
+          regionId: info.id,
+          regionName: info.name,
+          regionType: info.type,
+          latitude: info.location.latitude,
+          longitude: info.location.longitude,
+          climate: overview,
+        });
+        setSelectedRegion(info.id);
+
+        const boundary = await loadRegionBoundary(info.id);
+        if (boundaryRequestIdRef.current !== currentBoundaryRequestId) {
+          return;
+        }
+        setRegionBoundary(boundary);
+      } catch (error) {
+        console.error('Failed to fetch region info', error);
+        setRegionInfoError('Failed to load region information');
       }
-      const overview = formatClimateOverview(info.current_climate, activeLayer);
-      openRegionInfo({
-        regionId: info.id,
-        regionName: info.name,
-        regionType: info.type,
-        latitude: info.location.latitude,
-        longitude: info.location.longitude,
-        climate: overview,
-      });
-      setSelectedRegion(info.id);
-      void trackEvent('region_select', { region_type: info.type });
-
-      const boundary = await loadRegionBoundary(info.id);
-      if (boundaryRequestIdRef.current !== currentBoundaryRequestId) {
-        return;
-      }
-      setRegionBoundary(boundary);
-    } catch (error) {
-      console.error('Failed to fetch region info', error);
-      setRegionInfoError('Failed to load region information');
-    }
-  }, [
-    activeLayer,
-    openRegionInfo,
-    setRegionBoundary,
-    setRegionInfoLoading,
-    setRegionInfoError,
-    setSelectedRegion,
-  ]);
+    },
+    [
+      activeLayer,
+      openRegionInfo,
+      setRegionBoundary,
+      setRegionInfoLoading,
+      setRegionInfoError,
+      setSelectedRegion,
+    ],
+  );
 
   const climateTileUrl = `${tileServerUrl}/${activeLayer}/{z}/{x}/{y}.png`;
   const climateTileKey = `${activeLayer}-${mapLevel}-${tileServerUrl}`;
-  
+
   // Get layer-specific opacity for smoother blending
   // Each climate layer has optimized opacity for best visualization
   const tileOpacity = LAYER_OPACITY[activeLayer] || TILE_CONFIG.opacity;
@@ -136,13 +165,22 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
   }, [activeLayer, mapLevel, setLoading]);
 
   const clampToBounds = (r: RNRegion): RNRegion => {
-    const lat = Math.max(Math.min(r.latitude, QUEENSLAND_BOUNDS.north), QUEENSLAND_BOUNDS.south);
-    const lon = Math.max(Math.min(r.longitude, QUEENSLAND_BOUNDS.east), QUEENSLAND_BOUNDS.west);
+    const lat = Math.max(
+      Math.min(r.latitude, QUEENSLAND_BOUNDS.north),
+      QUEENSLAND_BOUNDS.south,
+    );
+    const lon = Math.max(
+      Math.min(r.longitude, QUEENSLAND_BOUNDS.east),
+      QUEENSLAND_BOUNDS.west,
+    );
     return { ...r, latitude: lat, longitude: lon };
   };
 
   const needSnapBack = (a: RNRegion, b: RNRegion): boolean => {
-    return !(nearlyEqual(a.latitude, b.latitude) && nearlyEqual(a.longitude, b.longitude));
+    return !(
+      nearlyEqual(a.latitude, b.latitude) &&
+      nearlyEqual(a.longitude, b.longitude)
+    );
   };
 
   useEffect(() => {
@@ -151,11 +189,11 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
         pendingTargetRef.current = target as any;
         mapRef.current?.animateToRegion(target as any, duration);
       };
-      providerRef.current.setRegion = (target) => {
+      providerRef.current.setRegion = target => {
         pendingTargetRef.current = target as any;
         mapRef.current?.animateToRegion(target as any, 0);
       };
-      providerRef.current.emitLongPress = (coordinate) => {
+      providerRef.current.emitLongPress = coordinate => {
         handleMapLongPress({ nativeEvent: { coordinate } });
       };
     }
@@ -172,7 +210,12 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
       isAnimatingRef.current = false;
     }, 700);
     return () => clearTimeout(timer);
-  }, [region.latitude, region.longitude, region.latitudeDelta, region.longitudeDelta]);
+  }, [
+    region.latitude,
+    region.longitude,
+    region.latitudeDelta,
+    region.longitudeDelta,
+  ]);
 
   const boundaryOverlays = useBoundaryOverlays();
 
@@ -190,7 +233,7 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
         style={styles.map}
         initialRegion={region}
         onPress={handleMapPress}
-        onRegionChangeComplete={(r) => {
+        onRegionChangeComplete={r => {
           const clamped = clampToBounds(r as any);
           if (needSnapBack(r as any, clamped)) {
             mapRef.current?.animateToRegion(clamped, 250);
@@ -220,7 +263,7 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
           opacity={tileOpacity}
           zIndex={2}
         />
-        {boundaryOverlays.map((overlay) => (
+        {boundaryOverlays.map(overlay => (
           <Polygon
             key={overlay.id}
             coordinates={overlay.coordinates}
@@ -231,17 +274,18 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
             zIndex={overlay.zIndex}
           />
         ))}
-        {regionBoundary && regionBoundary.polygons.map((polygon, idx) => (
-          <Polygon
-            key={`${regionBoundary.regionId}-${idx}`}
-            coordinates={polygon.outline}
-            holes={polygon.holes}
-            strokeColor={BOUNDARY_COLORS.SELECTED_STROKE}
-            strokeWidth={BOUNDARY_WIDTHS.SELECTED}
-            fillColor={BOUNDARY_COLORS.SELECTED_FILL}
-            zIndex={BOUNDARY_Z_INDEX.SELECTED_REGION}
-          />
-        ))}
+        {regionBoundary &&
+          regionBoundary.polygons.map((polygon, idx) => (
+            <Polygon
+              key={`${regionBoundary.regionId}-${idx}`}
+              coordinates={polygon.outline}
+              holes={polygon.holes}
+              strokeColor={BOUNDARY_COLORS.SELECTED_STROKE}
+              strokeWidth={BOUNDARY_WIDTHS.SELECTED}
+              fillColor={BOUNDARY_COLORS.SELECTED_FILL}
+              zIndex={BOUNDARY_Z_INDEX.SELECTED_REGION}
+            />
+          ))}
       </MapView>
     </View>
   );

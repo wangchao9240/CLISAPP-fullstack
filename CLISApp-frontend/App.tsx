@@ -19,6 +19,7 @@ import {
   onTokenRefresh,
   setupForegroundHandler,
 } from './src/services/notificationService';
+import { sendTelemetry } from './src/services/telemetryService';
 
 function App(): React.JSX.Element {
   useEffect(() => {
@@ -26,6 +27,7 @@ function App(): React.JSX.Element {
       return;
     }
 
+    void sendTelemetry();
     void initializeFCM();
 
     const unsubscribe = onTokenRefresh();

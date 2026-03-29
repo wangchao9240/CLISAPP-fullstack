@@ -38,10 +38,6 @@ jest.mock('react-native-device-info', () => ({
   getUniqueId: jest.fn(() => 'test-device-id'),
 }));
 
-jest.mock('../../../services/telemetryService', () => ({
-  trackEvent: jest.fn(),
-}));
-
 jest.mock('react-native-maps', () => {
   const React = require('react');
 
@@ -61,14 +57,21 @@ jest.mock('react-native-maps', () => {
 const { OpenStreetMap } = require('../OpenStreetMap');
 const { useMapStore } = require('../../../store/mapStore');
 const { useSettingsStore } = require('../../../store/settingsStore');
-const { fetchRegionInfoByCoordinates, formatClimateOverview } = require('../../../hooks/useApi');
-const useBoundaryOverlays = require('../../../hooks/useBoundaryOverlays').default;
+const {
+  fetchRegionInfoByCoordinates,
+  formatClimateOverview,
+} = require('../../../hooks/useApi');
+const useBoundaryOverlays =
+  require('../../../hooks/useBoundaryOverlays').default;
 const { apiService } = require('../../../services/ApiService');
-const { convertGeometryToShapes } = require('../../../services/boundaries/BoundaryStore');
+const {
+  convertGeometryToShapes,
+} = require('../../../services/boundaries/BoundaryStore');
 
 const mockUseMapStore = useMapStore as jest.Mock;
 const mockUseSettingsStore = useSettingsStore as jest.Mock;
-const mockFetchRegionInfoByCoordinates = fetchRegionInfoByCoordinates as jest.Mock;
+const mockFetchRegionInfoByCoordinates =
+  fetchRegionInfoByCoordinates as jest.Mock;
 const mockFormatClimateOverview = formatClimateOverview as jest.Mock;
 const mockUseBoundaryOverlays = useBoundaryOverlays as jest.Mock;
 const mockGetRegionBoundary = apiService.getRegionBoundary as jest.Mock;
@@ -104,11 +107,13 @@ describe('OpenStreetMap', () => {
         { latitude: -27.4, longitude: 153.0 },
         { latitude: -27.4, longitude: 153.1 },
       ],
-      holes: [[
-        { latitude: -27.48, longitude: 153.02 },
-        { latitude: -27.46, longitude: 153.02 },
-        { latitude: -27.46, longitude: 153.04 },
-      ]],
+      holes: [
+        [
+          { latitude: -27.48, longitude: 153.02 },
+          { latitude: -27.46, longitude: 153.02 },
+          { latitude: -27.46, longitude: 153.04 },
+        ],
+      ],
     };
 
     mockUseMapStore.mockReturnValue({
@@ -130,14 +135,16 @@ describe('OpenStreetMap', () => {
 
     create(<OpenStreetMap />);
 
-    expect(mockPolygon).toHaveBeenCalledWith(expect.objectContaining({
-      coordinates: selectedPolygon.outline,
-      holes: selectedPolygon.holes,
-      strokeColor: 'rgba(25, 118, 210, 0.9)',
-      strokeWidth: 2.5,
-      fillColor: 'rgba(25, 118, 210, 0.08)',
-      zIndex: 5,
-    }));
+    expect(mockPolygon).toHaveBeenCalledWith(
+      expect.objectContaining({
+        coordinates: selectedPolygon.outline,
+        holes: selectedPolygon.holes,
+        strokeColor: 'rgba(25, 118, 210, 0.9)',
+        strokeWidth: 2.5,
+        fillColor: 'rgba(25, 118, 210, 0.08)',
+        zIndex: 5,
+      }),
+    );
   });
 
   it('does not write unchanged region values back to the store on region change complete', () => {
@@ -180,11 +187,13 @@ describe('OpenStreetMap', () => {
 
     const geometry = {
       type: 'Polygon',
-      coordinates: [[
-        [153, -27.5],
-        [153, -27.4],
-        [153.1, -27.4],
-      ]],
+      coordinates: [
+        [
+          [153, -27.5],
+          [153, -27.4],
+          [153.1, -27.4],
+        ],
+      ],
     };
     const convertedPolygons = [
       {
@@ -280,29 +289,37 @@ describe('OpenStreetMap', () => {
 
     const firstGeometry = {
       type: 'Polygon',
-      coordinates: [[
-        [153.0, -27.5],
-        [153.0, -27.4],
-        [153.1, -27.4],
-      ]],
+      coordinates: [
+        [
+          [153.0, -27.5],
+          [153.0, -27.4],
+          [153.1, -27.4],
+        ],
+      ],
     };
     const secondGeometry = {
       type: 'Polygon',
-      coordinates: [[
-        [152.9, -27.6],
-        [152.9, -27.5],
-        [153.0, -27.5],
-      ]],
+      coordinates: [
+        [
+          [152.9, -27.6],
+          [152.9, -27.5],
+          [153.0, -27.5],
+        ],
+      ],
     };
-    const firstPolygons = [{ outline: [{ latitude: -27.5, longitude: 153.0 }] }];
-    const secondPolygons = [{ outline: [{ latitude: -27.6, longitude: 152.9 }] }];
+    const firstPolygons = [
+      { outline: [{ latitude: -27.5, longitude: 153.0 }] },
+    ];
+    const secondPolygons = [
+      { outline: [{ latitude: -27.6, longitude: 152.9 }] },
+    ];
 
     let resolveFirstBoundary: (value: any) => void;
     let resolveSecondBoundary: (value: any) => void;
-    const firstBoundaryPromise = new Promise((resolve) => {
+    const firstBoundaryPromise = new Promise(resolve => {
       resolveFirstBoundary = resolve;
     });
-    const secondBoundaryPromise = new Promise((resolve) => {
+    const secondBoundaryPromise = new Promise(resolve => {
       resolveSecondBoundary = resolve;
     });
 

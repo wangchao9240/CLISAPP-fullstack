@@ -1,19 +1,39 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, Modal, Pressable } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  Modal,
+  Pressable,
+} from 'react-native';
 import { useMapStore } from '../../store/mapStore';
 import { CLIMATE_LAYERS } from '../../constants/climateData';
 import { ClimateLayer } from '../../types/climate.types';
-import { trackEvent } from '../../services/telemetryService';
 
-export const LAYERS: Array<{ key: ClimateLayer; label: string; emoji: string; available: boolean }> = [
+export const LAYERS: Array<{
+  key: ClimateLayer;
+  label: string;
+  emoji: string;
+  available: boolean;
+}> = [
   { key: 'pm25', label: 'PM2.5', emoji: '💨', available: true },
-  { key: 'precipitation', label: 'Precipitation', emoji: '🌧️', available: true },
+  {
+    key: 'precipitation',
+    label: 'Precipitation',
+    emoji: '🌧️',
+    available: true,
+  },
   { key: 'uv', label: 'UV Index', emoji: '☀️', available: true },
   { key: 'humidity', label: 'Humidity', emoji: '💧', available: true },
   { key: 'temperature', label: 'Temperature', emoji: '🌡️', available: true },
 ];
 
-export const LayerSelector: React.FC<{ style?: any; onSelected?: () => void }> = ({ style, onSelected }) => {
+export const LayerSelector: React.FC<{
+  style?: any;
+  onSelected?: () => void;
+}> = ({ style, onSelected }) => {
   const { activeLayer, setActiveLayer } = useMapStore();
   const [menuVisible, setMenuVisible] = useState(false);
 
@@ -26,14 +46,13 @@ export const LayerSelector: React.FC<{ style?: any; onSelected?: () => void }> =
     }
     setActiveLayer(key as any);
     setMenuVisible(false);
-    void trackEvent('layer_change', { layer: key });
     onSelected?.();
   };
 
   return (
     <View style={[styles.container, style]}>
       {/* Current Layer Button */}
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.layerButton}
         onPress={() => setMenuVisible(!menuVisible)}
       >
@@ -44,26 +63,35 @@ export const LayerSelector: React.FC<{ style?: any; onSelected?: () => void }> =
       {/* Dropdown Menu */}
       {menuVisible && (
         <>
-          <Pressable 
-            style={styles.overlay} 
+          <Pressable
+            style={styles.overlay}
             onPress={() => setMenuVisible(false)}
           />
           <View style={styles.menu}>
             {LAYERS.map(item => (
-              <TouchableOpacity 
-                key={item.key} 
-                onPress={() => onSelect(item.key, item.available)} 
+              <TouchableOpacity
+                key={item.key}
+                onPress={() => onSelect(item.key, item.available)}
                 style={[
                   styles.menuItem,
-                  item.key === activeLayer && styles.activeItem
+                  item.key === activeLayer && styles.activeItem,
                 ]}
               >
                 <Text style={styles.menuEmoji}>{item.emoji}</Text>
-                <Text style={[styles.menuLabel, item.key === activeLayer && styles.activeLabel]}>
+                <Text
+                  style={[
+                    styles.menuLabel,
+                    item.key === activeLayer && styles.activeLabel,
+                  ]}
+                >
                   {item.label}
                 </Text>
-                {item.key === activeLayer && <Text style={styles.checkmark}>✓</Text>}
-                {!item.available && <Text style={styles.comingSoon}>(soon)</Text>}
+                {item.key === activeLayer && (
+                  <Text style={styles.checkmark}>✓</Text>
+                )}
+                {!item.available && (
+                  <Text style={styles.comingSoon}>(soon)</Text>
+                )}
               </TouchableOpacity>
             ))}
           </View>
