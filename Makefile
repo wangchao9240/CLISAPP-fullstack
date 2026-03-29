@@ -164,6 +164,15 @@ pipeline-ssc: ## Compute per-SSC climate averages from latest processed GeoTIFF 
 	}
 	@PYTHONPATH=CLISApp-backend $(VENV_PYTHON) -m data_pipeline.processing.geo.compute_ssc_averages
 
+.PHONY: pipeline-baseline
+pipeline-baseline: ## Process historical baseline CSV into frontend JSON asset
+	@command -v python3 >/dev/null 2>&1 || { \
+		echo "  FAIL python3"; \
+		echo "  Install Python 3 to continue."; \
+		exit 1; \
+	}
+	@PYTHONPATH=CLISApp-backend $(VENV_PYTHON) -m data_pipeline.processing.geo.process_baseline
+
 .PHONY: pipeline-all
 pipeline-all: pipeline ## Alias for 'pipeline' - run all layer pipelines
 
