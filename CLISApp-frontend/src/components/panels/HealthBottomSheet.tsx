@@ -8,6 +8,7 @@ import {
 import { Snackbar } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { formatBadgeText, getActiveClimateStat } from '../../constants/climateData';
+import { ClimateChangeIndicator } from '../UI/ClimateChangeIndicator';
 import { useMapStore } from '../../store/mapStore';
 import { FavoriteLocation, useFavoritesStore } from '../../store/favoritesStore';
 
@@ -207,17 +208,10 @@ export const HealthBottomSheet: React.FC = () => {
         <View style={styles.divider} />
 
         {/* Half Level Content - Climate Change Indicator */}
-        <View style={styles.climateCard}>
-          <View style={styles.climateCardHeader}>
-            <Icon name="thermometer" size={16} color="#005dac" />
-            <Text style={styles.climateCardTitle}>Climate Change Indicator</Text>
-          </View>
-          <View style={styles.climateCardValueContainer}>
-            <Icon name="arrow-top-right" size={24} color="#FF7043" />
-            <Text style={styles.climateCardValue}>+0.4°C</Text>
-          </View>
-          <Text style={styles.climateCardSubtitle}>above 1890-1960 baseline</Text>
-        </View>
+        <ClimateChangeIndicator
+          regionSscId={regionInfo.regionId}
+          climate={regionInfo.climate}
+        />
 
         {/* Current Layer Data Section */}
         <View style={styles.layerDataCard}>
@@ -399,44 +393,6 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: 'rgba(193, 198, 212, 0.2)',
     marginVertical: 32,
-  },
-  climateCard: {
-    backgroundColor: '#F2F3FC',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 24,
-  },
-  climateCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  climateCardTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#414752',
-    textTransform: 'uppercase',
-    letterSpacing: -0.2,
-  },
-  climateCardValueContainer: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 8,
-  },
-  climateCardValue: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#FF7043',
-    letterSpacing: -1,
-  },
-  climateCardSubtitle: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#717783',
-    marginTop: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
   layerDataCard: {
     backgroundColor: '#F9F9FF', // surface - tonal layering instead of border
