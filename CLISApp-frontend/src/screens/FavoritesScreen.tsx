@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { Snackbar } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,6 +13,7 @@ import { useMapStore } from '../store/mapStore';
 import { apiService } from '../services/ApiService';
 import { formatClimateOverview } from '../hooks/useApi';
 import { loadRegionBoundary } from '../services/boundaries/boundaryLoader';
+import type { RegionClimateOverview } from '../types/region.types';
 
 interface FavoritesScreenProps {
   onNavigateToMap?: () => void;
@@ -28,6 +29,62 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
   const [deletedFavorite, setDeletedFavorite] =
     useState<FavoriteLocation | null>(null);
   const [isSnackbarVisible, setIsSnackbarVisible] = useState(false);
+  const [climateMap, setClimateMap] = useState<
+    Record<string, RegionClimateOverview>
+  >({});
+  const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
+  const climateMapRef = useRef(climateMap);
+  const loadingIdsRef = useRef(loadingIds);
+
+  useEffect(() => {
+    climateMapRef.current = climateMap;
+  }, [climateMap]);
+
+  useEffect(() => {
+    loadingIdsRef.current = loadingIds;
+  }, [loadingIds]);
+
+  useEffect(() => {
+    const toFetch = favorites.filter(
+      (favorite) =>
+        !climateMapRef.current[favorite.regionId] &&
+        !loadingIdsRef.current.has(favorite.regionId),
+    );
+
+    if (toFetch.length === 0) {
+      return;
+    }
+
+    setLoadingIds((prev) => {
+      const next = new Set(prev);
+      toFetch.forEach((favorite) => next.add(favorite.regionId));
+      return next;
+    });
+
+    toFetch.forEach(async (favorite) => {
+      try {
+        const response = await apiService.getRegionInfo(favorite.regionId, true);
+        if (response.success && response.data?.current_climate) {
+          const overview = formatClimateOverview(
+            response.data.current_climate,
+            'temperature',
+          );
+          setClimateMap((prev) => ({
+            ...prev,
+            [favorite.regionId]: overview,
+          }));
+        }
+      } catch {
+        // Climate fetch failure is non-critical; the card shows "No data".
+      } finally {
+        setLoadingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(favorite.regionId);
+          return next;
+        });
+      }
+    });
+  }, [favorites]);
 
   const handleDelete = useCallback(
     (favorite: FavoriteLocation) => {
@@ -118,11 +175,13 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
     ({ item }: { item: FavoriteLocation }) => (
       <FavoriteLocationCard
         favorite={item}
+        climate={climateMap[item.regionId] ?? null}
+        isClimateLoading={loadingIds.has(item.regionId)}
         onPress={() => handleCardPress(item)}
         onDelete={() => handleDelete(item)}
       />
     ),
-    [handleCardPress, handleDelete],
+    [climateMap, handleCardPress, handleDelete, loadingIds],
   );
 
   const keyExtractor = useCallback(

@@ -1,17 +1,29 @@
 import React from 'react';
 import { act, create } from 'react-test-renderer';
+import type { RegionClimateOverview } from '../../../types/region.types';
 
 jest.mock('react-native-gesture-handler', () => {
+  const React = require('react');
   const { View } = require('react-native');
+  const Swipeable = React.forwardRef(
+    ({ children, renderRightActions }: any, ref: any) => {
+      React.useImperativeHandle(ref, () => ({ close: () => {} }));
+
+      return (
+        <View testID="swipeable">
+          {children}
+          {renderRightActions && (
+            <View testID="right-actions">{renderRightActions()}</View>
+          )}
+        </View>
+      );
+    },
+  );
+
+  Swipeable.displayName = 'Swipeable';
+
   return {
-    Swipeable: ({ children, renderRightActions }: any) => (
-      <View testID="swipeable">
-        {children}
-        {renderRightActions && (
-          <View testID="right-actions">{renderRightActions()}</View>
-        )}
-      </View>
-    ),
+    Swipeable,
   };
 });
 
@@ -33,6 +45,20 @@ const makeFavorite = (overrides: Record<string, any> = {}) => ({
   ...overrides,
 });
 
+const makeClimate = (
+  overrides: Partial<RegionClimateOverview> = {},
+): RegionClimateOverview => ({
+  primary: {
+    layer: 'temperature',
+    name: '2m Temperature',
+    value: 24,
+    unit: '°C',
+    category: 'Moderate',
+  },
+  secondary: [],
+  ...overrides,
+});
+
 describe('FavoriteLocationCard', () => {
   const onPress = jest.fn();
   const onDelete = jest.fn();
@@ -43,6 +69,8 @@ describe('FavoriteLocationCard', () => {
     const tree = create(
       <FavoriteLocationCard
         favorite={makeFavorite()}
+        climate={null}
+        isClimateLoading={false}
         onPress={onPress}
         onDelete={onDelete}
       />,
@@ -58,10 +86,12 @@ describe('FavoriteLocationCard', () => {
     expect(nameText).toBeDefined();
   });
 
-  it('renders placeholder health label', () => {
+  it('shows no data when climate is unavailable', () => {
     const tree = create(
       <FavoriteLocationCard
         favorite={makeFavorite()}
+        climate={null}
+        isClimateLoading={false}
         onPress={onPress}
         onDelete={onDelete}
       />,
@@ -69,7 +99,7 @@ describe('FavoriteLocationCard', () => {
     const texts = tree.root.findAllByType('Text' as any);
     const badge = texts.find((t: any) => {
       try {
-        return t.props.children === 'Data pending';
+        return t.props.children === 'No data';
       } catch {
         return false;
       }
@@ -77,10 +107,62 @@ describe('FavoriteLocationCard', () => {
     expect(badge).toBeDefined();
   });
 
+  it('shows loading state while climate data is fetching', () => {
+    const tree = create(
+      <FavoriteLocationCard
+        favorite={makeFavorite()}
+        climate={null}
+        isClimateLoading={true}
+        onPress={onPress}
+        onDelete={onDelete}
+      />,
+    );
+    const texts = tree.root.findAllByType('Text' as any);
+    const loadingText = texts.find((t: any) => {
+      try {
+        return t.props.children === 'Loading...';
+      } catch {
+        return false;
+      }
+    });
+    expect(loadingText).toBeDefined();
+  });
+
+  it('shows category and temperature when climate data is available', () => {
+    const tree = create(
+      <FavoriteLocationCard
+        favorite={makeFavorite()}
+        climate={makeClimate()}
+        isClimateLoading={false}
+        onPress={onPress}
+        onDelete={onDelete}
+      />,
+    );
+    const texts = tree.root.findAllByType('Text' as any);
+    const categoryText = texts.find((t: any) => {
+      try {
+        return t.props.children === 'Moderate';
+      } catch {
+        return false;
+      }
+    });
+    const temperatureText = texts.find((t: any) => {
+      try {
+        return t.props.children === '24 °C';
+      } catch {
+        return false;
+      }
+    });
+    expect(categoryText).toBeDefined();
+    expect(temperatureText).toBeDefined();
+  });
+
   it('calls onPress when card is pressed', () => {
     const tree = create(
       <FavoriteLocationCard
         favorite={makeFavorite()}
+        climate={null}
+        isClimateLoading={false}
         onPress={onPress}
         onDelete={onDelete}
       />,
@@ -96,6 +178,8 @@ describe('FavoriteLocationCard', () => {
     const tree = create(
       <FavoriteLocationCard
         favorite={makeFavorite()}
+        climate={null}
+        isClimateLoading={false}
         onPress={onPress}
         onDelete={onDelete}
       />,
@@ -111,6 +195,8 @@ describe('FavoriteLocationCard', () => {
     const tree = create(
       <FavoriteLocationCard
         favorite={makeFavorite({ timestamp: twoHoursAgo })}
+        climate={null}
+        isClimateLoading={false}
         onPress={onPress}
         onDelete={onDelete}
       />,

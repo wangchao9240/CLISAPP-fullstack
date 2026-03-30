@@ -2,10 +2,19 @@ import React, { useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { getActiveClimateStat } from '../../constants/climateData';
+import {
+  CATEGORY_BADGE_COLORS,
+  DEFAULT_BADGE_COLORS,
+} from '../../constants/healthColors';
 import type { FavoriteLocation } from '../../store/favoritesStore';
+import type { RegionClimateOverview } from '../../types/region.types';
+import { getIndicatorState } from './ClimateChangeIndicator';
 
 interface FavoriteLocationCardProps {
   favorite: FavoriteLocation;
+  climate: RegionClimateOverview | null;
+  isClimateLoading: boolean;
   onPress: () => void;
   onDelete: () => void;
 }
@@ -42,10 +51,21 @@ const renderRightActions = (onDelete: () => void, regionName: string) => (
 
 export const FavoriteLocationCard: React.FC<FavoriteLocationCardProps> = ({
   favorite,
+  climate,
+  isClimateLoading,
   onPress,
   onDelete,
 }) => {
   const swipeableRef = useRef<Swipeable>(null);
+  const tempStat = getActiveClimateStat(climate, 'temperature');
+  const category = tempStat?.category ?? null;
+  const badgeColors = category
+    ? CATEGORY_BADGE_COLORS[category] ?? DEFAULT_BADGE_COLORS
+    : DEFAULT_BADGE_COLORS;
+  const indicatorState = getIndicatorState(favorite.regionId, climate);
+  const healthLabel = isClimateLoading ? 'Loading...' : category ?? 'No data';
+  const { iconName, iconColor, valueText } = indicatorState;
+  const hasDelta = iconName != null && iconColor != null && valueText != null;
 
   const handleDelete = () => {
     swipeableRef.current?.close();
@@ -70,8 +90,25 @@ export const FavoriteLocationCard: React.FC<FavoriteLocationCardProps> = ({
             {favorite.regionName}
           </Text>
           <View style={styles.metaRow}>
-            <View style={styles.healthDot} />
-            <Text style={styles.healthLabel}>Data pending</Text>
+            <View
+              style={[
+                styles.healthDot,
+                {
+                  backgroundColor: isClimateLoading
+                    ? '#BDBDBD'
+                    : badgeColors.dot,
+                },
+              ]}
+            />
+            <Text style={styles.healthLabel}>{healthLabel}</Text>
+            {tempStat ? (
+              <>
+                <View style={styles.separatorDot} />
+                <Text style={styles.metaText}>
+                  {`${tempStat.value} ${tempStat.unit}`}
+                </Text>
+              </>
+            ) : null}
             <View style={styles.separatorDot} />
             <Text style={styles.metaText}>
               {formatRelativeTime(favorite.timestamp)}
@@ -79,6 +116,14 @@ export const FavoriteLocationCard: React.FC<FavoriteLocationCardProps> = ({
           </View>
         </View>
         <View style={styles.rightContent}>
+          {hasDelta ? (
+            <View style={styles.deltaContainer}>
+              <Icon name={iconName} size={14} color={iconColor} />
+              <Text style={[styles.deltaText, { color: iconColor }]}>
+                {valueText}
+              </Text>
+            </View>
+          ) : null}
           <Icon name="chevron-right" size={16} color="#BDBDBD" />
         </View>
       </Pressable>
@@ -147,6 +192,16 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     justifyContent: 'center',
     paddingLeft: 8,
+  },
+  deltaContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginBottom: 4,
+  },
+  deltaText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
   deleteAction: {
     backgroundColor: '#E57373',

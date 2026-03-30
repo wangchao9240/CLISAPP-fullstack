@@ -8,19 +8,15 @@ import {
 import { Snackbar } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { formatBadgeText, getActiveClimateStat } from '../../constants/climateData';
+import {
+  CATEGORY_BADGE_COLORS,
+  DEFAULT_BADGE_COLORS,
+} from '../../constants/healthColors';
 import { ClimateChangeIndicator } from '../UI/ClimateChangeIndicator';
 import { useMapStore } from '../../store/mapStore';
 import { FavoriteLocation, useFavoritesStore } from '../../store/favoritesStore';
 
 const SNAP_POINTS = ['40%', '60%', '85%'];
-const CATEGORY_BADGE_COLORS: Record<string, { bg: string; text: string }> = {
-  'Very Low': { bg: '#C8E6C9', text: '#1B5E20' },
-  Low: { bg: '#DCEDC8', text: '#33691E' },
-  Moderate: { bg: '#FFDBC7', text: '#733600' },
-  High: { bg: '#FFCCBC', text: '#BF360C' },
-  'Very High': { bg: '#FFCDD2', text: '#B71C1C' },
-};
-const DEFAULT_BADGE_COLORS = { bg: '#FFDBC7', text: '#733600' };
 
 export const HealthBottomSheet: React.FC = () => {
   const bottomSheetRef = useRef<BottomSheetModal>(null);

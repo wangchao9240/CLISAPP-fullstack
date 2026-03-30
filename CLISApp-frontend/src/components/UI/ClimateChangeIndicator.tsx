@@ -23,9 +23,13 @@ const VARIANT_COLORS = {
   neutral: '#78909C',
 } as const;
 
-const formatDiff = (diff: number): string => `${diff > 0 ? '+' : ''}${diff.toFixed(1)}°C`;
+export const formatDiff = (diff: number): string =>
+  `${diff > 0 ? '+' : ''}${diff.toFixed(1)}°C`;
 
-const getIndicatorState = (regionSscId: string | null, climate: RegionClimateOverview | null) => {
+export const getIndicatorState = (
+  regionSscId: string | null,
+  climate: RegionClimateOverview | null,
+) => {
   if (!regionSscId) {
     return {
       iconName: null,
