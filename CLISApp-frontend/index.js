@@ -7,9 +7,9 @@ import App from './App';
 import { name as appName } from './app.json';
 
 if (Platform.OS === 'android') {
-  const messaging = require('@react-native-firebase/messaging').default;
+  const { getMessaging, setBackgroundMessageHandler } = require('@react-native-firebase/messaging');
 
-  messaging().setBackgroundMessageHandler(async remoteMessage => {
+  setBackgroundMessageHandler(getMessaging(), async remoteMessage => {
     console.log('Received background FCM message:', remoteMessage);
   });
 }

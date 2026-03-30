@@ -16,7 +16,7 @@ import { HealthBottomSheet } from './src/components/panels/HealthBottomSheet';
 import { theme } from './src/constants/theme';
 import {
   initializeFCM,
-  onTokenRefresh,
+  listenToTokenRefresh,
   setupForegroundHandler,
 } from './src/services/notificationService';
 import { sendTelemetry } from './src/services/telemetryService';
@@ -30,7 +30,7 @@ function App(): React.JSX.Element {
     void sendTelemetry();
     void initializeFCM();
 
-    const unsubscribe = onTokenRefresh();
+    const unsubscribe = listenToTokenRefresh();
     const unsubscribeFromForegroundMessages = setupForegroundHandler();
 
     return () => {

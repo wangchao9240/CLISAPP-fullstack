@@ -1,11 +1,17 @@
 import { Alert, PermissionsAndroid, Platform } from 'react-native';
-import messaging, {
-  FirebaseMessagingTypes,
+import {
+  getMessaging,
+  getToken,
+  subscribeToTopic,
+  onMessage,
+  onTokenRefresh,
 } from '@react-native-firebase/messaging';
+import type { RemoteMessage } from '@react-native-firebase/messaging';
 
 export type TokenRefreshUnsubscribe = () => void;
 export type ForegroundMessageUnsubscribe = () => void;
 
+const messaging = getMessaging();
 const HEALTH_ALERTS_TOPIC = 'qld-health-alerts';
 const DEFAULT_ALERT_TITLE = 'Climate Health Alert';
 const DEFAULT_ALERT_BODY = 'A new climate health alert is available.';
@@ -43,7 +49,7 @@ export const subscribeToHealthAlerts = async (): Promise<boolean> => {
   }
 
   try {
-    await messaging().subscribeToTopic(HEALTH_ALERTS_TOPIC);
+    await subscribeToTopic(messaging, HEALTH_ALERTS_TOPIC);
     console.log('Subscribed to FCM topic:', HEALTH_ALERTS_TOPIC);
     return true;
   } catch (error) {
@@ -58,14 +64,12 @@ export const setupForegroundHandler = (): ForegroundMessageUnsubscribe => {
   }
 
   try {
-    return messaging().onMessage(
-      (remoteMessage: FirebaseMessagingTypes.RemoteMessage) => {
-        const title = remoteMessage.notification?.title ?? DEFAULT_ALERT_TITLE;
-        const body = remoteMessage.notification?.body ?? DEFAULT_ALERT_BODY;
+    return onMessage(messaging, (remoteMessage: RemoteMessage) => {
+      const title = remoteMessage.notification?.title ?? DEFAULT_ALERT_TITLE;
+      const body = remoteMessage.notification?.body ?? DEFAULT_ALERT_BODY;
 
-        Alert.alert(title, body);
-      },
-    );
+      Alert.alert(title, body);
+    });
   } catch (error) {
     console.error('Failed to set up foreground FCM handler:', error);
     return () => undefined;
@@ -86,7 +90,7 @@ export const initializeFCM = async (): Promise<string | null> => {
       );
     }
 
-    const token = await messaging().getToken();
+    const token = await getToken(messaging);
     console.log('FCM device token:', token);
 
     await subscribeToHealthAlerts();
@@ -98,13 +102,13 @@ export const initializeFCM = async (): Promise<string | null> => {
   }
 };
 
-export const onTokenRefresh = (): TokenRefreshUnsubscribe => {
+export const listenToTokenRefresh = (): TokenRefreshUnsubscribe => {
   if (Platform.OS !== 'android') {
     return () => undefined;
   }
 
   try {
-    return messaging().onTokenRefresh((token: string) => {
+    return onTokenRefresh(messaging, (token: string) => {
       console.log('FCM token refreshed:', token);
     });
   } catch (error) {
