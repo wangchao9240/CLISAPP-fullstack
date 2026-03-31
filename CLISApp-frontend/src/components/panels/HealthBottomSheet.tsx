@@ -12,6 +12,7 @@ import {
   CATEGORY_BADGE_COLORS,
   DEFAULT_BADGE_COLORS,
 } from '../../constants/healthColors';
+import { formatTimeAgo } from '../../utils/formatTimeAgo';
 import { ClimateChangeIndicator } from '../UI/ClimateChangeIndicator';
 import { useMapStore } from '../../store/mapStore';
 import { FavoriteLocation, useFavoritesStore } from '../../store/favoritesStore';
@@ -34,7 +35,26 @@ export const HealthBottomSheet: React.FC = () => {
 
   const snapPoints = useMemo(() => SNAP_POINTS, []);
   const activeStat = getActiveClimateStat(regionInfo.climate, activeLayer);
+  const [timeAgoLabel, setTimeAgoLabel] = useState(() =>
+    activeStat?.lastUpdated ? formatTimeAgo(activeStat.lastUpdated) : 'Unknown'
+  );
   const badgeColors = CATEGORY_BADGE_COLORS[activeStat?.category ?? ''] ?? DEFAULT_BADGE_COLORS;
+
+  useEffect(() => {
+    const ts = activeStat?.lastUpdated;
+    if (!ts || !regionInfo.visible) {
+      setTimeAgoLabel(ts ? formatTimeAgo(ts) : 'Unknown');
+      return;
+    }
+
+    setTimeAgoLabel(formatTimeAgo(ts));
+
+    const interval = setInterval(() => {
+      setTimeAgoLabel(formatTimeAgo(ts));
+    }, 60_000);
+
+    return () => clearInterval(interval);
+  }, [activeStat?.lastUpdated, regionInfo.visible]);
 
   const animateHeart = useCallback(() => {
     Animated.spring(heartScale, {
@@ -286,7 +306,7 @@ export const HealthBottomSheet: React.FC = () => {
         {/* Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>Data source: Open-Meteo API | Aggregated health data</Text>
-          <Text style={[styles.footerText, styles.footerTextBold]}>Last updated: 2 hours ago</Text>
+          <Text style={[styles.footerText, styles.footerTextBold]}>Last updated: {timeAgoLabel}</Text>
         </View>
       </BottomSheetScrollView>
       <Snackbar
