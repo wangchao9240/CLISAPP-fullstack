@@ -29,6 +29,7 @@ export const HealthBottomSheet: React.FC = () => {
     regionInfo,
     activeLayer,
     closeRegionInfo,
+    clearRegionInfo,
   } = useMapStore();
 
   const { isFavorite, addFavorite, restoreFavorite, removeFavorite, getFavorite } = useFavoritesStore();
@@ -102,6 +103,12 @@ export const HealthBottomSheet: React.FC = () => {
     },
     [regionInfo.visible, closeRegionInfo]
   );
+
+  const handleSheetDismiss = useCallback(() => {
+    if (!useMapStore.getState().regionInfo.visible) {
+      clearRegionInfo();
+    }
+  }, [clearRegionInfo]);
 
   const handleFavoriteToggle = useCallback(() => {
     if (!regionInfo.regionId || !regionInfo.regionName) {
@@ -185,6 +192,7 @@ export const HealthBottomSheet: React.FC = () => {
       index={0}
       snapPoints={snapPoints}
       onChange={handleSheetChanges}
+      onDismiss={handleSheetDismiss}
       enablePanDownToClose={true}
       backdropComponent={renderBackdrop}
       backgroundStyle={styles.sheetBackground}

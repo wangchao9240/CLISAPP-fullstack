@@ -2,6 +2,8 @@ import React from 'react';
 import { Animated } from 'react-native';
 import { act, create } from 'react-test-renderer';
 
+let mockBottomSheetModalProps: any;
+
 jest.mock('../../../store/mapStore', () => ({
   useMapStore: jest.fn(),
 }));
@@ -38,6 +40,7 @@ jest.mock('@gorhom/bottom-sheet', () => {
   const React = require('react');
 
   const BottomSheetModal = React.forwardRef((props: any, ref: any) => {
+    mockBottomSheetModalProps = props;
     React.useImperativeHandle(ref, () => ({
       present: jest.fn(),
       dismiss: jest.fn(),
@@ -200,6 +203,7 @@ describe('HealthBottomSheet', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     springStart = jest.fn((callback?: () => void) => callback?.());
+    mockBottomSheetModalProps = undefined;
     springSpy = jest
       .spyOn(Animated, 'spring')
       .mockReturnValue({ start: springStart } as any);
@@ -310,5 +314,95 @@ describe('HealthBottomSheet', () => {
     });
 
     expect(restoreFavorite).toHaveBeenCalledWith(favorite);
+  });
+
+  it('waits until modal dismiss to clear region data after a swipe close', () => {
+    const closeRegionInfo = jest.fn();
+    const clearRegionInfo = jest.fn();
+    (mockUseMapStore as any).getState = jest.fn(() => ({
+      regionInfo: {
+        visible: false,
+      },
+    }));
+
+    mockUseMapStore.mockReturnValue({
+      regionInfo: {
+        visible: true,
+        regionId: 'ssc-1',
+        regionName: 'Fortitude Valley',
+        regionType: 'ssc',
+        climate: null,
+        latitude: -27.457,
+        longitude: 153.034,
+        loading: false,
+        error: null,
+      },
+      activeLayer: 'temperature',
+      closeRegionInfo,
+      clearRegionInfo,
+    });
+    mockUseFavoritesStore.mockReturnValue({
+      isFavorite: jest.fn(() => false),
+      addFavorite: jest.fn(),
+      removeFavorite: jest.fn(),
+      restoreFavorite: jest.fn(),
+      getFavorite: jest.fn(),
+    });
+
+    create(<HealthBottomSheet />);
+
+    act(() => {
+      mockBottomSheetModalProps.onChange(-1);
+    });
+
+    expect(closeRegionInfo).toHaveBeenCalledTimes(1);
+    expect(clearRegionInfo).not.toHaveBeenCalled();
+
+    act(() => {
+      mockBottomSheetModalProps.onDismiss();
+    });
+
+    expect(clearRegionInfo).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not clear region data on dismiss if another region is already visible', () => {
+    const clearRegionInfo = jest.fn();
+    (mockUseMapStore as any).getState = jest.fn(() => ({
+      regionInfo: {
+        visible: true,
+      },
+    }));
+
+    mockUseMapStore.mockReturnValue({
+      regionInfo: {
+        visible: true,
+        regionId: 'ssc-2',
+        regionName: 'Sunnybank Hills',
+        regionType: 'ssc',
+        climate: null,
+        latitude: -27.58,
+        longitude: 153.06,
+        loading: false,
+        error: null,
+      },
+      activeLayer: 'temperature',
+      closeRegionInfo: jest.fn(),
+      clearRegionInfo,
+    });
+    mockUseFavoritesStore.mockReturnValue({
+      isFavorite: jest.fn(() => false),
+      addFavorite: jest.fn(),
+      removeFavorite: jest.fn(),
+      restoreFavorite: jest.fn(),
+      getFavorite: jest.fn(),
+    });
+
+    create(<HealthBottomSheet />);
+
+    act(() => {
+      mockBottomSheetModalProps.onDismiss();
+    });
+
+    expect(clearRegionInfo).not.toHaveBeenCalled();
   });
 });

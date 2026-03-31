@@ -18,14 +18,15 @@ interface MapScreenProps {
 export const MapScreen: React.FC<MapScreenProps> = ({ isActive = true }) => {
   const [legendVisible, setLegendVisible] = useState(false);
   const [locating, setLocating] = useState(false);
-  const { setRegion, regionInfo, closeRegionInfo } = useMapStore();
+  const { setRegion, regionInfo, closeRegionInfo, clearRegionInfo } = useMapStore();
 
   // Close sheet when tab becomes inactive (fixes sheet leak to other tabs)
   useEffect(() => {
     if (!isActive && regionInfo.visible) {
       closeRegionInfo();
+      clearRegionInfo();
     }
-  }, [isActive, regionInfo.visible, closeRegionInfo]);
+  }, [isActive, regionInfo.visible, closeRegionInfo, clearRegionInfo]);
 
   // Android back button handling (AC #5, #6)
   const handleBackPress = useCallback(() => {

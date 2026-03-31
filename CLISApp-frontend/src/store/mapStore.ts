@@ -42,6 +42,7 @@ interface MapState {
     climate: RegionClimateOverview | null;
   }) => void;
   closeRegionInfo: () => void;
+  clearRegionInfo: () => void;
   setRegionInfoLoading: (loading: boolean) => void;
   setRegionInfoError: (error?: string) => void;
   setRegionBoundary: (boundary: RegionBoundaryData | null) => void;
@@ -100,6 +101,10 @@ export const useMapStore = create<MapState>()(
           },
         }),
       closeRegionInfo: () =>
+        set((state) => ({
+          regionInfo: { ...state.regionInfo, visible: false, loading: false, error: null },
+        })),
+      clearRegionInfo: () =>
         set({
           regionInfo: {
             visible: false,
