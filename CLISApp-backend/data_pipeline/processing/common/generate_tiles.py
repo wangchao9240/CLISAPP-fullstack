@@ -6,6 +6,7 @@ Tile generation script - convert GeoTIFF into XYZ tiles
 import rasterio
 import numpy as np
 from rasterio.warp import reproject, Resampling, calculate_default_transform
+from rasterio.transform import from_bounds
 from rasterio.windows import Window
 from PIL import Image
 import math
@@ -18,6 +19,8 @@ from typing import Dict, List, Optional, Tuple
 import warnings
 import json
 import tempfile
+import threading
+import time
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -93,6 +96,12 @@ DEFAULT_LAYER_STYLES: Dict[str, Dict[str, List]] = {
 }
 
 class PM25TileGenerator:
+    METATILE_SIZE = 8
+    PNG_COMPRESS_LEVEL = 1
+    MAX_WORKER_CAP = 4
+    UPSAMPLE_WORKERS: Optional[int] = None
+    RENDER_WORKERS: Optional[int] = None
+
     def __init__(
         self,
         geotiff_file,
@@ -141,6 +150,23 @@ class PM25TileGenerator:
                 hex_to_rgba("#800080"),
                 hex_to_rgba("#4B0082"),
             ])
+
+    def _resolve_worker_count(self, override: Optional[int] = None) -> int:
+        worker_count = override if override is not None else (os.cpu_count() or 2)
+        return max(1, min(int(worker_count), self.MAX_WORKER_CAP))
+
+    def _tile_output_path(self, zoom: int, x: int, y: int) -> Path:
+        return Path(self.output_dir) / self.layer_name / str(zoom) / str(x) / f"{y}.png"
+
+    def _save_rgba_tile(self, zoom: int, x: int, y: int, rgba_data: np.ndarray) -> str:
+        tile_path = self._tile_output_path(zoom, x, y)
+        tile_path.parent.mkdir(parents=True, exist_ok=True)
+        Image.fromarray(rgba_data).save(
+            tile_path,
+            "PNG",
+            compress_level=self.PNG_COMPRESS_LEVEL,
+        )
+        return str(tile_path)
     
     def deg2num(self, lat_deg, lon_deg, zoom):
         """Convert latitude/longitude to tile coordinates"""
@@ -315,8 +341,9 @@ class PM25TileGenerator:
                 f"Parent zoom {parent_zoom} directory missing, cannot upsample to {zoom}"
             )
             return 0
+        wall_start = time.time()
         logger.info(f"Upsampling zoom {parent_zoom} -> {zoom} (tile pyramid)")
-        count = 0
+        parent_tiles: List[Tuple[int, int, Path]] = []
         for x_dir in parent_dir.iterdir():
             if not x_dir.is_dir() or not x_dir.name.isdigit():
                 continue
@@ -324,34 +351,71 @@ class PM25TileGenerator:
             for y_file in x_dir.glob("*.png"):
                 if not y_file.stem.isdigit():
                     continue
-                py = int(y_file.stem)
-                try:
-                    with Image.open(y_file) as img:
-                        w, h = img.size
-                        hw, hh = w // 2, h // 2
-                        quadrants = [
-                            (0, 0, hw, hh, 0, 0),
-                            (hw, 0, w, hh, 1, 0),
-                            (0, hh, hw, h, 0, 1),
-                            (hw, hh, w, h, 1, 1),
-                        ]
-                        for x1, y1, x2, y2, dx, dy in quadrants:
-                            child = img.crop((x1, y1, x2, y2))
-                            child = child.resize((w, h), Image.BILINEAR)
-                            cx, cy = px * 2 + dx, py * 2 + dy
-                            out_dir = (
-                                Path(self.output_dir)
-                                / self.layer_name
-                                / str(zoom)
-                                / str(cx)
-                            )
-                            out_dir.mkdir(parents=True, exist_ok=True)
-                            child.save(out_dir / f"{cy}.png", "PNG")
-                            count += 1
-                except Exception:
-                    continue
-        logger.info(f"Zoom {zoom} upsample complete: {count} tiles created")
+                parent_tiles.append((px, int(y_file.stem), y_file))
+
+        if not parent_tiles:
+            logger.info(f"Zoom {zoom} upsample complete: 0 tiles created")
+            return 0
+
+        destination_dirs = {
+            Path(self.output_dir) / self.layer_name / str(zoom) / str(px * 2 + dx)
+            for px, _, _ in parent_tiles
+            for dx in (0, 1)
+        }
+        for directory in destination_dirs:
+            directory.mkdir(parents=True, exist_ok=True)
+
+        worker_count = self._resolve_worker_count(self.UPSAMPLE_WORKERS)
+        count = 0
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            futures = [
+                executor.submit(self._upsample_single_parent, zoom, px, py, parent_path)
+                for px, py, parent_path in parent_tiles
+            ]
+            for future in as_completed(futures):
+                count += future.result()
+
+        elapsed = time.time() - wall_start
+        logger.info(
+            "Zoom %s upsample complete: %s parents -> %s tiles in %.2fs",
+            zoom,
+            len(parent_tiles),
+            count,
+            elapsed,
+        )
         return count
+
+    def _upsample_single_parent(self, zoom: int, px: int, py: int, parent_path: Path) -> int:
+        start = time.time()
+        try:
+            with Image.open(parent_path) as img:
+                w, h = img.size
+                hw, hh = w // 2, h // 2
+                quadrants = [
+                    (0, 0, hw, hh, 0, 0),
+                    (hw, 0, w, hh, 1, 0),
+                    (0, hh, hw, h, 0, 1),
+                    (hw, hh, w, h, 1, 1),
+                ]
+                count = 0
+                for x1, y1, x2, y2, dx, dy in quadrants:
+                    child = img.crop((x1, y1, x2, y2)).resize((w, h), Image.BILINEAR)
+                    cx, cy = px * 2 + dx, py * 2 + dy
+                    out_path = Path(self.output_dir) / self.layer_name / str(zoom) / str(cx) / f"{cy}.png"
+                    child.save(out_path, "PNG", compress_level=self.PNG_COMPRESS_LEVEL)
+                    child.close()
+                    count += 1
+                logger.debug(
+                    "Upsampled parent %s/%s/%s -> %s children in %.1fms",
+                    zoom - 1, px, py, count, (time.time() - start) * 1000.0,
+                )
+                return count
+        except Exception as exc:
+            logger.warning(
+                "Failed to upsample parent tile %s/%s/%s from %s: %s",
+                zoom - 1, px, py, parent_path, exc,
+            )
+            return 0
 
     def _extract_tile_data(self, src: rasterio.io.DatasetReader, zoom: int, x: int, y: int) -> Optional[np.ndarray]:
         lat_max, lon_min = self.num2deg(x, y, zoom)
@@ -404,7 +468,6 @@ class PM25TileGenerator:
 
         target_size = self.tile_size + (self.buffer_pixels * 2)
         if data.shape != (target_size, target_size):
-            from rasterio.transform import from_bounds
             dst_transform = from_bounds(
                 buffered_lon_min, buffered_lat_min, buffered_lon_max, buffered_lat_max, target_size, target_size
             )
@@ -462,6 +525,144 @@ class PM25TileGenerator:
 
         return best_data
 
+    def generate_metatile(
+        self,
+        src: rasterio.io.DatasetReader,
+        zoom: int,
+        meta_x_start: int,
+        meta_y_start: int,
+        meta_x_end: int,
+        meta_y_end: int,
+    ) -> int:
+        tile_count_x = meta_x_end - meta_x_start + 1
+        tile_count_y = meta_y_end - meta_y_start + 1
+        lat_max, lon_min = self.num2deg(meta_x_start, meta_y_start, zoom)
+        lat_min, lon_max = self.num2deg(meta_x_end + 1, meta_y_end + 1, zoom)
+
+        if self.buffer_pixels > 0:
+            # Match per-tile buffer: degrees-per-pixel based on single tile span
+            single_tile_lat = (lat_max - lat_min) / max(1, tile_count_y)
+            single_tile_lon = (lon_max - lon_min) / max(1, tile_count_x)
+            lat_buffer = (single_tile_lat / self.tile_size) * self.buffer_pixels
+            lon_buffer = (single_tile_lon / self.tile_size) * self.buffer_pixels
+        else:
+            lat_buffer = 0.0
+            lon_buffer = 0.0
+
+        buffered_lat_max = lat_max + lat_buffer
+        buffered_lat_min = lat_min - lat_buffer
+        buffered_lon_min = lon_min - lon_buffer
+        buffered_lon_max = lon_max + lon_buffer
+
+        try:
+            window = rasterio.windows.from_bounds(
+                buffered_lon_min,
+                buffered_lat_min,
+                buffered_lon_max,
+                buffered_lat_max,
+                src.transform,
+            )
+        except Exception:
+            return 0
+
+        if window.width <= 0 or window.height <= 0:
+            return 0
+
+        if window.width < 1 or window.height < 1:
+            col_off = max(0, int(math.floor(window.col_off)))
+            row_off = max(0, int(math.floor(window.row_off)))
+            width = max(1, int(math.ceil(window.width)))
+            height = max(1, int(math.ceil(window.height)))
+            max_width = src.width - col_off
+            max_height = src.height - row_off
+            if max_width <= 0 or max_height <= 0:
+                return 0
+            width = min(width, max_width)
+            height = min(height, max_height)
+            window = Window(col_off, row_off, width, height)
+
+        try:
+            data = src.read(1, window=window)
+        except Exception:
+            return 0
+
+        if data.size == 0 or np.all(np.isnan(data)):
+            return 0
+
+        buffer = self.buffer_pixels
+        target_width = tile_count_x * self.tile_size + (buffer * 2)
+        target_height = tile_count_y * self.tile_size + (buffer * 2)
+
+        if data.shape != (target_height, target_width):
+            from rasterio.transform import from_bounds
+
+            dst_transform = from_bounds(
+                buffered_lon_min,
+                buffered_lat_min,
+                buffered_lon_max,
+                buffered_lat_max,
+                target_width,
+                target_height,
+            )
+
+            resampled = np.empty((target_height, target_width), dtype=np.float32)
+            reproject(
+                data.reshape(1, *data.shape),
+                resampled.reshape(1, target_height, target_width),
+                src_transform=rasterio.windows.transform(window, src.transform),
+                src_crs=src.crs,
+                dst_transform=dst_transform,
+                dst_crs=src.crs,
+                resampling=Resampling.bilinear,
+            )
+            data = resampled
+
+        tiles_generated = 0
+        tile_data_size = self.tile_size + (buffer * 2)
+
+        for tile_y_offset in range(tile_count_y):
+            for tile_x_offset in range(tile_count_x):
+                x = meta_x_start + tile_x_offset
+                y = meta_y_start + tile_y_offset
+                row_start = tile_y_offset * self.tile_size
+                col_start = tile_x_offset * self.tile_size
+                tile_data = data[
+                    row_start:row_start + tile_data_size,
+                    col_start:col_start + tile_data_size,
+                ]
+
+                if tile_data.shape != (tile_data_size, tile_data_size):
+                    continue
+
+                if buffer > 0:
+                    center_data = tile_data[
+                        buffer:buffer + self.tile_size,
+                        buffer:buffer + self.tile_size,
+                    ]
+                else:
+                    center_data = tile_data
+
+                valid_mask = ~np.isnan(center_data)
+                valid_ratio = float(np.count_nonzero(valid_mask)) / center_data.size
+                if valid_ratio == 0.0 or valid_ratio < 0.02:
+                    continue
+
+                filled = self.fill_missing_with_neighbor_mean(tile_data)
+                rgba_data = self.apply_pm25_colormap(filled)
+                if buffer > 0:
+                    rgba_data = rgba_data[
+                        buffer:buffer + self.tile_size,
+                        buffer:buffer + self.tile_size,
+                    ]
+
+                if np.all(rgba_data[:, :, 3] == 0):
+                    continue
+
+                self._save_rgba_tile(zoom, x, y, rgba_data)
+                tiles_generated += 1
+
+        return tiles_generated
+
     def generate_tile(self, zoom, x, y):
         """Generate a single tile"""
         try:
@@ -494,15 +695,7 @@ class PM25TileGenerator:
             if np.all(rgba_data[:, :, 3] == 0):  # fully transparent
                 return None
 
-            img = Image.fromarray(rgba_data)
-
-            tile_dir = os.path.join(self.output_dir, self.layer_name, str(zoom), str(x))
-            os.makedirs(tile_dir, exist_ok=True)
-
-            tile_path = os.path.join(tile_dir, f"{y}.png")
-            img.save(tile_path, 'PNG')
-
-            return tile_path
+            return self._save_rgba_tile(zoom, x, y, rgba_data)
 
         except Exception as e:
             logger.debug(f"Failed to generate tile {zoom}/{x}/{y}: {e}")
@@ -510,6 +703,7 @@ class PM25TileGenerator:
     
     def generate_tiles_for_zoom(self, zoom):
         """Generate all tiles for the specified zoom level"""
+        wall_start = time.time()
         logger.info(f"Starting tile generation for zoom level {zoom}")
         
         # Read dataset bounds
@@ -532,25 +726,67 @@ class PM25TileGenerator:
         
         logger.info(f"Zoom {zoom}: tile range X({x_min}-{x_max}) Y({y_min}-{y_max})")
         logger.info(f"Zoom {zoom}: processing {total_tiles} tile positions")
-        
-        # Generate tiles in parallel
-        with ThreadPoolExecutor(max_workers=4) as executor:
-            futures = []
-            
-            for x in range(x_min, x_max + 1):
-                for y in range(y_min, y_max + 1):
-                    future = executor.submit(self.generate_tile, zoom, x, y)
-                    futures.append(future)
-            
-            # Collect results
-            for future in as_completed(futures):
-                result = future.result()
-                if result:
-                    tiles_generated += 1
-                    if tiles_generated % 20 == 0:
+
+        metatiles: List[Tuple[int, int, int, int]] = []
+        for meta_x_start in range(x_min, x_max + 1, self.METATILE_SIZE):
+            meta_x_end = min(meta_x_start + self.METATILE_SIZE - 1, x_max)
+            for meta_y_start in range(y_min, y_max + 1, self.METATILE_SIZE):
+                meta_y_end = min(meta_y_start + self.METATILE_SIZE - 1, y_max)
+                metatiles.append((meta_x_start, meta_y_start, meta_x_end, meta_y_end))
+
+        thread_local = threading.local()
+        opened_sources: List[rasterio.io.DatasetReader] = []
+        opened_sources_lock = threading.Lock()
+
+        def get_thread_local_src() -> rasterio.io.DatasetReader:
+            local_src = getattr(thread_local, "src", None)
+            if local_src is None or local_src.closed:
+                with warnings.catch_warnings():
+                    warnings.filterwarnings(
+                        "ignore",
+                        category=rasterio.errors.NotGeoreferencedWarning,
+                    )
+                    local_src = rasterio.open(self.geotiff_file)
+                thread_local.src = local_src
+                with opened_sources_lock:
+                    opened_sources.append(local_src)
+            return local_src
+
+        def render_metatile_task(meta_bounds: Tuple[int, int, int, int]) -> int:
+            local_src = get_thread_local_src()
+            return self.generate_metatile(local_src, zoom, *meta_bounds)
+
+        worker_count = self._resolve_worker_count(self.RENDER_WORKERS)
+        logger.info(
+            "Zoom %s: rendering %s metatiles with %s workers (metatile_size=%s)",
+            zoom,
+            len(metatiles),
+            worker_count,
+            self.METATILE_SIZE,
+        )
+
+        try:
+            with ThreadPoolExecutor(max_workers=worker_count) as executor:
+                futures = [executor.submit(render_metatile_task, meta) for meta in metatiles]
+                for future in as_completed(futures):
+                    tiles_generated += future.result()
+                    if tiles_generated and tiles_generated % 20 == 0:
                         logger.info(f"Zoom {zoom}: generated {tiles_generated} valid tiles")
-        
-        logger.info(f"Zoom {zoom} complete: generated {tiles_generated} valid tiles")
+        finally:
+            for opened_src in opened_sources:
+                try:
+                    opened_src.close()
+                except Exception:
+                    pass
+
+        elapsed = time.time() - wall_start
+        logger.info(
+            "Zoom %s direct render complete: generated %s valid tiles across %s positions in %.2fs",
+            zoom,
+            tiles_generated,
+            total_tiles,
+            elapsed,
+        )
         return tiles_generated
     
     def generate_all_tiles(self):
@@ -572,6 +808,8 @@ class PM25TileGenerator:
             self.data_max = float(np.nanmax(data_range))
             logger.info(f"Data range: {self.data_min:.2f} - {self.data_max:.2f}")
             pixel_deg = abs(src.transform.a)
+            # Regression note: native_max_zoom must be computed from the original
+            # source raster before _create_upsampled_tif() swaps in a temp file.
             self.native_max_zoom = self._compute_native_max_zoom(pixel_deg)
             logger.info(
                 f"Native max zoom: {self.native_max_zoom} (pixel res: {pixel_deg:.4f}deg)"
