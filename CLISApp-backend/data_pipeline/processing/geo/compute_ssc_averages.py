@@ -13,7 +13,7 @@ from typing import Any, Mapping
 import numpy as np
 import rasterio
 from rasterio.mask import mask
-from shapely.geometry import mapping
+from shapely.geometry import mapping, shape
 
 from data_pipeline.processing.geo.process_boundaries import (
     SSC_SHP,
@@ -138,9 +138,13 @@ def _mean_value_for_region(
     region: SscRegion,
 ) -> float | None:
     try:
-        data, _ = mask(dataset, [region.geometry], crop=True, filled=False, indexes=1)
+        data, _ = mask(
+            dataset, [region.geometry],
+            crop=True, filled=False, indexes=1,
+            all_touched=True,
+        )
     except ValueError:
-        return None
+        data = None
     except Exception as exc:
         LOGGER.warning(
             "Failed to mask %s for %s: %s",
@@ -148,19 +152,30 @@ def _mean_value_for_region(
             dataset.name,
             exc,
         )
-        return None
+        data = None
 
-    values = (
-        data.compressed()
-        if np.ma.isMaskedArray(data)
-        else np.asarray(data, dtype=np.float32).ravel()
-    )
-    finite_values = np.asarray(values, dtype=np.float32)
-    finite_values = finite_values[np.isfinite(finite_values)]
-    if finite_values.size == 0:
-        return None
+    if data is not None:
+        values = (
+            data.compressed()
+            if np.ma.isMaskedArray(data)
+            else np.asarray(data, dtype=np.float32).ravel()
+        )
+        finite_values = np.asarray(values, dtype=np.float32)
+        finite_values = finite_values[np.isfinite(finite_values)]
+        if finite_values.size > 0:
+            return float(np.mean(finite_values))
 
-    return float(np.mean(finite_values))
+    # Nearest-pixel fallback for tiny polygons where mask returned no data
+    try:
+        centroid = shape(region.geometry).centroid
+        for sample in dataset.sample([(centroid.x, centroid.y)]):
+            pixel = float(sample[0])
+            if np.isfinite(pixel):
+                return pixel
+    except Exception as exc:
+        LOGGER.warning("Nearest-pixel fallback failed for %s: %s", region.ssc_id, exc)
+
+    return None
 
 
 def _compute_layer_averages(

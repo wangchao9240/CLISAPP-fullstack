@@ -9,8 +9,12 @@ import rasterio
 from rasterio.transform import from_bounds
 from shapely.geometry import box
 
+from unittest.mock import MagicMock, patch
+
 from data_pipeline.processing.geo.compute_ssc_averages import (
     LayerSpec,
+    SscRegion,
+    _mean_value_for_region,
     compute_ssc_climate_averages,
 )
 
@@ -110,3 +114,28 @@ def test_compute_ssc_climate_averages_generates_expected_json(
         "temperature": {"value": None, "unit": "C"},
     }
     assert any("temperature had 1 SSCs with 0 valid pixels" in message for message in caplog.messages)
+
+
+@patch("data_pipeline.processing.geo.compute_ssc_averages.mask")
+def test_mean_value_for_region_falls_back_to_nearest_pixel(mock_mask: MagicMock) -> None:
+    """When mask() raises ValueError (tiny polygon), fallback samples the centroid pixel."""
+    mock_mask.side_effect = ValueError("no data within geometry")
+
+    mock_dataset = MagicMock()
+    mock_dataset.name = "test_raster.tif"
+    mock_dataset.sample.return_value = iter([np.array([42.0])])
+
+    region = SscRegion(
+        ssc_id="99999",
+        name="Tiny Polygon",
+        group_id="group_test",
+        geometry={
+            "type": "Polygon",
+            "coordinates": [[[0.0, 0.0], [0.001, 0.0], [0.001, 0.001], [0.0, 0.001], [0.0, 0.0]]],
+        },
+    )
+
+    result = _mean_value_for_region(mock_dataset, region)
+
+    assert result == 42.0
+    mock_dataset.sample.assert_called_once()
