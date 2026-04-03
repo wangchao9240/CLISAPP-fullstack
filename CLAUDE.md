@@ -56,6 +56,8 @@ make pipeline-baseline  # Process historical baseline CSV into frontend JSON ass
 GeoTIFF-only mode (skip tile generation):
 ```bash
 SKIP_TILES=1 python -m data_pipeline.processing.openmeteo.process_all_layers
+# or
+python -m data_pipeline.processing.openmeteo.process_all_layers --geotiff-only
 ```
 
 ### Frontend (React Native)
@@ -182,7 +184,7 @@ Without this key, Android will show the same tiles regardless of layer selection
 The `mapStore` uses versioned persistence to handle breaking changes:
 
 ```typescript
-const MAP_STORE_VERSION = 2;  // Increment when storage schema changes
+const MAP_STORE_VERSION = 3;  // Increment when storage schema changes
 ```
 
 **Don't persist `activeLayer`** — it causes startup issues where users see unexpected layers. Always start with `DEFAULT_LAYER`.
@@ -196,7 +198,12 @@ GOOGLE_MAPS_API_KEY=...
 # TILE_SERVER_URL=...     # Don't set - breaks platform detection
 ```
 
-If `API_BASE_URL` or `TILE_SERVER_URL` are set in `.env`, they override the platform-aware logic. Keep them commented out for development.
+URL resolution priority in `src/constants/apiEndpoints.ts` (checked at runtime via `react-native-config`):
+1. `PRODUCTION_API_URL` / `PRODUCTION_TILE_URL` — if set, wins unconditionally
+2. `API_BASE_URL` / `TILE_SERVER_URL` — overrides platform defaults
+3. Platform-aware defaults (localhost for iOS, 10.0.2.2 for Android)
+
+For local development, keep `PRODUCTION_*`, `API_BASE_URL`, and `TILE_SERVER_URL` **all commented out** in `.env` so platform detection works. Uncomment `PRODUCTION_*` only when pointing the app at the remote server.
 
 **Backend** (`CLISApp-backend/.env`): No credentials required — all data from Open-Meteo API.
 
@@ -254,3 +261,18 @@ gcloud compute ssh clisapp-server --zone=us-central1-a --command="cd /opt/clisap
 ```
 
 This is a development/prototype system. See `docs/deployment-guide.md` for production considerations.
+
+## Documentation
+
+- `docs/index.md` — Documentation starting point
+- `docs/architecture-backend.md` / `docs/architecture-frontend.md` — Architecture details
+- `docs/api-contracts-backend.md` — API endpoint contracts
+- `docs/development-guide-backend.md` / `docs/development-guide-frontend.md` — Setup guides
+- `docs/integration-architecture.md` — How frontend and backend connect
+- `docs/state-management-frontend.md` — Zustand store patterns
+
+Mobile verification evidence (screenshots, test results) goes in:
+```
+_bmad-output/verification-evidence/<date>/mobile/ios/
+_bmad-output/verification-evidence/<date>/mobile/android/
+```

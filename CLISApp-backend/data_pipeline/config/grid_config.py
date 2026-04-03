@@ -3,8 +3,7 @@
 Queensland grid configuration for climate data sampling.
 
 This module defines the grid points for sampling climate data across Queensland.
-Using 25km resolution (~0.225 degrees) to improve sampling density while
-remaining within API limits.
+Using 50km resolution (~0.45 degrees) to balance data coverage and API efficiency.
 """
 
 from __future__ import annotations
@@ -21,8 +20,8 @@ QLD_BOUNDS = {
 }
 
 # Grid resolution settings
-GRID_RESOLUTION_KM = 25  # 25km between sample points
-GRID_RESOLUTION_DEG = 0.225  # Approximately 25km at Queensland latitudes
+GRID_RESOLUTION_KM = 50  # 50km between sample points
+GRID_RESOLUTION_DEG = 0.45  # Approximately 50km at Queensland latitudes
 
 # Data layers to fetch
 CLIMATE_LAYERS = [
@@ -101,12 +100,12 @@ def generate_grid_points() -> List[Dict[str, float]]:
 
     Returns:
         List of dictionaries with 'latitude' and 'longitude' keys.
-        Each point represents a 25km x 25km cell center.
+        Each point represents a 50km x 50km cell center.
 
     Example:
         >>> points = generate_grid_points()
         >>> len(points)
-        6278
+        1628
         >>> points[0]
         {'latitude': -29.0, 'longitude': 138.0}
     """
