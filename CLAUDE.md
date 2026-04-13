@@ -62,6 +62,8 @@ python -m data_pipeline.processing.openmeteo.process_all_layers --geotiff-only
 
 ### Frontend (React Native)
 
+**Requires Node >= 20.**
+
 ```bash
 cd CLISApp-frontend
 npm start              # Start Metro bundler
@@ -71,19 +73,21 @@ npm run lint           # Run ESLint
 npm test               # Run Jest tests (preset: react-native)
 ```
 
+Uses `patch-package` (runs automatically via `postinstall`) — check `patches/` for any patched dependencies after `npm install`.
+
 ### Backend Tests
 
 ```bash
-# From repository root
-pytest                                  # Run all backend tests
-pytest CLISApp-backend/tests/test_health_endpoints.py  # Run single test file
+# From repository root — runs root-level tests (tests/)
+pytest                                  # Run all root tests
+pytest tests/test_health_endpoints.py   # Run single test file
 pytest -k "test_name"                   # Run specific test by name
 
-# From backend directory
+# From backend directory — runs backend tests (CLISApp-backend/tests/)
 cd CLISApp-backend && pytest
 ```
 
-Config: `pytest.ini` at both repo root and `CLISApp-backend/` (testpaths: `tests/`).
+Both directories have their own `pytest.ini` with `testpaths = tests/`. The root `tests/` contains integration and pipeline tests; `CLISApp-backend/tests/` contains backend service unit tests. The backend `conftest.py` adds `CLISApp-backend/` to `sys.path` so tests can import `app.*` and `data_pipeline.*` directly.
 
 ### Verification & Quality
 
@@ -121,22 +125,31 @@ Two **separate** FastAPI applications sharing configuration via `app/core/config
    - Business logic: `app/services/` — `region_service.py`, `tile_service.py`, `ssc_climate_service.py`
 
 2. **Tile Server** (`data_pipeline.servers.tile_server:app`, port 8000): PNG tile delivery
-   - Tile URL format: `/tiles/{layer}/{z}/{x}/{y}.png`
+   - Canonical URL: `/tiles/{layer}/{level}/{z}/{x}/{y}.png` (level = `suburb` or `lga`)
+   - Legacy URL: `/tiles/{layer}/{z}/{x}/{y}.png` (deprecated, defaults to `suburb`)
 
-Both use `uvicorn` and run as separate processes.
+Both use `uvicorn` and run as separate processes. Both must run from `CLISApp-backend/` working directory (the Makefile handles this).
+
+### Phase System
+
+The codebase follows a phased migration. Phase 0 was the prototype, Phase 1 is the current state. Several deprecated endpoints (legacy `/health`, legacy tile URLs without `{level}`) are marked for Phase 2 removal. When modifying API endpoints, check for deprecation comments before removing or changing behavior.
 
 ### Data Pipeline Flow
 
 ```
 Open-Meteo API → Download → GeoTIFF processing → Tile generation (zoom 6-12)
+                                                → SSC averages (per-region climate)
 ```
 
 - **Source**: Open-Meteo API (free, no credentials)
 - **Layers**: PM2.5, precipitation, temperature, humidity, UV
 - **Coverage**: Queensland bounds (-10° to -29° lat, 138° to 154° lon)
+- **Grid**: 50km resolution (~0.45°), configured in `data_pipeline/config/grid_config.py`
 - **Canonical raster path**: `CLISApp-backend/data/processing/<layer>/<layer>_latest.tif`
 - **Legacy path**: `data_pipeline/data/processed/` is NOT used by the API for climate sampling
 - Higher zoom levels (10-12) are upsampled from zoom 9 base tiles
+- **SSC averages**: Climate data aggregated per Statistical Subdivision Code (geographic region). Used by `ssc_climate_service.py` for the `/regions/by-coordinates` endpoint's `current_climate` field.
+- **Processing modules**: `data_pipeline/processing/` organized by source — `openmeteo/` (main pipeline), `geo/` (SSC/baseline), plus legacy per-layer modules
 
 When running pipeline modules directly, set `PYTHONPATH=CLISApp-backend`.
 
@@ -157,7 +170,9 @@ When running pipeline modules directly, set `PYTHONPATH=CLISApp-backend`.
 
 - **Custom Hooks**: `useApi`, `useBoundaryOverlays`, `useDynamicThreshold`
 
-- **UI Panels**: `HealthBottomSheet` (climate health indicator), `RegionInfoPanel`
+- **Navigation**: Stack navigator with two screens — `MapScreen` (main map view) and `FavoritesScreen` (saved locations)
+
+- **UI Panels**: `HealthBottomSheet` (climate health indicator with per-layer readings), `LayerBar`/`LayerSelector` (climate layer switching), `RegionSearchBar`, `Legend`
 
 ## Critical Implementation Details
 
@@ -214,6 +229,14 @@ Android 9+ blocks HTTP by default. `AndroidManifest.xml` must include `android:u
 ### iOS Production HTTP Access
 
 `Info.plist` allows HTTP access to the production API host (`136.114.38.138`) so simulator/device can reach the deployed backend.
+
+### FastAPI Interactive Docs
+
+Swagger UI (`/docs`) and ReDoc (`/redoc`) are only available when `DEBUG=true` (the default for local dev). They are disabled in production.
+
+### Telemetry
+
+The API service initializes a local SQLite database on startup for anonymous usage telemetry (`telemetry_service.py` / `init_db()`). Telemetry endpoints are under `/api/v1/telemetry`.
 
 ## Service Health Checks
 
