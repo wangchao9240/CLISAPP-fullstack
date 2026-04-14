@@ -22,7 +22,7 @@ FCM_TOPIC = "qld-health-alerts"
 SEVERITY_ORDER = {
     "Good": 0,
     "Moderate": 1,
-    "Poor": 2,
+    "Unhealthy": 2,
     "Hazardous": 3,
 }
 

@@ -12,7 +12,7 @@
           12,
           35
         ],
-        "Poor": [
+        "Unhealthy": [
           35,
           55
         ],
@@ -24,7 +24,7 @@
       "advice": {
         "Good": "Air quality is satisfactory.",
         "Moderate": "Sensitive groups should limit prolonged outdoor exertion.",
-        "Poor": "Everyone should reduce outdoor activity.",
+        "Unhealthy": "Everyone should reduce outdoor activity.",
         "Hazardous": "Avoid all outdoor activity. Stay indoors with windows closed."
       }
     },
@@ -40,7 +40,7 @@
           3,
           6
         ],
-        "Poor": [
+        "Unhealthy": [
           6,
           8
         ],
@@ -52,7 +52,7 @@
       "advice": {
         "Good": "UV levels are low. Sunscreen is optional for short exposure.",
         "Moderate": "Wear sunscreen, a hat, and sunglasses during midday sun.",
-        "Poor": "Apply SPF 50+, wear protective clothing, and seek shade around midday.",
+        "Unhealthy": "Apply SPF 50+, wear protective clothing, and seek shade around midday.",
         "Hazardous": "Avoid direct sun exposure. Stay indoors or in deep shade between 10am and 3pm."
       }
     },
@@ -68,7 +68,7 @@
           10,
           20
         ],
-        "Poor": [
+        "Unhealthy": [
           20,
           30
         ],
@@ -80,7 +80,7 @@
       "advice": {
         "Good": "Temperature is comfortable for most outdoor activity.",
         "Moderate": "Carry water and take shade breaks during the warmest part of the day.",
-        "Poor": "Limit strenuous outdoor activity and check on children, older people, and pets.",
+        "Unhealthy": "Limit strenuous outdoor activity and check on children, older people, and pets.",
         "Hazardous": "Avoid outdoor exertion. Stay in air-conditioning or a cool place and hydrate frequently."
       }
     },
@@ -96,7 +96,7 @@
           30,
           50
         ],
-        "Poor": [
+        "Unhealthy": [
           50,
           70
         ],
@@ -108,7 +108,7 @@
       "advice": {
         "Good": "Humidity is comfortable for most people.",
         "Moderate": "Take regular breaks, drink water, and watch for early signs of heat stress.",
-        "Poor": "Reduce strenuous activity and stay in shaded or ventilated areas.",
+        "Unhealthy": "Reduce strenuous activity and stay in shaded or ventilated areas.",
         "Hazardous": "Avoid prolonged outdoor activity. Move to a cool, dry place and monitor for heat illness."
       }
     },
@@ -124,7 +124,7 @@
           0.5,
           2
         ],
-        "Poor": [
+        "Unhealthy": [
           2,
           10
         ],
@@ -136,7 +136,7 @@
       "advice": {
         "Good": "Rainfall is light and conditions are generally manageable.",
         "Moderate": "Carry rain protection and allow extra travel time on wet roads.",
-        "Poor": "Avoid unnecessary travel during heavy showers and watch for localised flooding.",
+        "Unhealthy": "Avoid unnecessary travel during heavy showers and watch for localised flooding.",
         "Hazardous": "Stay off flooded roads and seek shelter away from creeks, drains, and low-lying areas."
       }
     }
