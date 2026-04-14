@@ -6,6 +6,8 @@ export interface RegionClimateStat {
   value: number;
   unit: string;
   category?: string;
+  riskLevel?: string;
+  advice?: string;
   description?: string;
   lastUpdated?: string;
 }

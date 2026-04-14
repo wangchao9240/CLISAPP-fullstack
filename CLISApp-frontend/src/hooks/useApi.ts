@@ -187,6 +187,8 @@ export const formatClimateOverview = (
       value: data.value,
       unit: data.unit,
       category: data.category ?? undefined,
+      riskLevel: data.risk_level ?? undefined,
+      advice: data.advice ?? undefined,
       description: config?.description,
       lastUpdated: data.timestamp,
     }];

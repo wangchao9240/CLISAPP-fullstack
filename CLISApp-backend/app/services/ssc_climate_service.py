@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional
 
 from app.models.climate import ClimateDataPoint, ClimateLayer
 from app.services.climate_data_service import ClimateDataService
+from app.services.health_threshold_service import get_health_threshold_service
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ class SscClimateService:
         self._cached_mtime_ns: int | None = None
         self._cached_payload: dict[str, Any] | None = None
         self._categorizer = ClimateDataService()
+        self._health_thresholds = get_health_threshold_service()
         self._layer_units = {
             layer.value: settings.unit
             for layer, settings in self._categorizer._layers.items()
@@ -75,6 +77,10 @@ class SscClimateService:
                 continue
 
             category = self._categorizer._categorize(layer, value)
+            risk_level = self._health_thresholds.get_risk_level(layer.value, value)
+            advice: str | None = None
+            if risk_level:
+                advice = self._health_thresholds.get_advice(layer.value, risk_level) or None
             measurements[layer.value] = ClimateDataPoint(
                 layer=layer,
                 value=round(value, self._layer_precision.get(layer.value, 2)),
@@ -82,6 +88,8 @@ class SscClimateService:
                 timestamp=timestamp,
                 quality="estimated",
                 category=category,
+                risk_level=risk_level,
+                advice=advice,
             )
 
         return measurements or None

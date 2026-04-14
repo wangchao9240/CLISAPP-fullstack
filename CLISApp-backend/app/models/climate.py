@@ -32,6 +32,14 @@ class ClimateDataPoint(BaseModel):
     timestamp: datetime = Field(..., description="Measurement timestamp")
     quality: Optional[str] = Field(None, description="Data quality indicator")
     category: Optional[str] = Field(None, description="Qualitative level or label")
+    risk_level: Optional[str] = Field(
+        None,
+        description="Health risk category from HealthThresholdService: Good|Moderate|Unhealthy|Hazardous",
+    )
+    advice: Optional[str] = Field(
+        None,
+        description="Plain-language health advice for the current risk_level",
+    )
 
 
 class ClimateDataConfig(BaseModel):

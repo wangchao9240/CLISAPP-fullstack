@@ -10,7 +10,13 @@ from app.services.region_service import RegionService
 from app.services.ssc_climate_service import SscClimateService
 
 
-def _write_ssc_payload(path: Path, *, timestamp: str, temperature: float) -> None:
+def _write_ssc_payload(
+    path: Path,
+    *,
+    timestamp: str,
+    temperature: float,
+    pm25: float | None = None,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "timestamp": timestamp,
@@ -21,6 +27,7 @@ def _write_ssc_payload(path: Path, *, timestamp: str, temperature: float) -> Non
                 "name": "Alpha Plains",
                 "group_id": "group_brisbane_city",
                 "temperature": {"value": temperature, "unit": "C"},
+                "pm25": {"value": pm25, "unit": "µg/m³"} if pm25 is not None else {"value": None, "unit": "µg/m³"},
                 "humidity": {"value": None, "unit": "%"},
             }
         },
@@ -115,3 +122,21 @@ def test_region_service_prefers_ssc_data_and_falls_back_for_missing_layers() -> 
     assert result["temperature"].value == 26.5
     assert result["humidity"].value == 72
     assert fake_point_service.calls == [(-27.5, 153.0, ["humidity"])]
+
+
+def test_ssc_climate_service_adds_health_risk_level_and_advice_for_pm25(tmp_path: Path) -> None:
+    data_path = tmp_path / "ssc_climate_values.json"
+    _write_ssc_payload(
+        data_path,
+        timestamp="2026-03-17T12:00:00Z",
+        temperature=31.25,
+        pm25=35.0,
+    )
+
+    service = SscClimateService(data_path=data_path)
+
+    result = service.get_climate_for_ssc("ssc_10001")
+
+    assert result is not None
+    assert result["pm25"].risk_level == "Unhealthy"
+    assert result["pm25"].advice == "Everyone should reduce outdoor activity."

@@ -5,15 +5,12 @@ import {
   BottomSheetScrollView,
   BottomSheetBackdrop,
 } from '@gorhom/bottom-sheet';
-import { Snackbar } from 'react-native-paper';
+import { ActivityIndicator, Snackbar } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { formatBadgeText, getActiveClimateStat } from '../../constants/climateData';
-import {
-  CATEGORY_BADGE_COLORS,
-  DEFAULT_BADGE_COLORS,
-} from '../../constants/healthColors';
+import { getActiveClimateStat } from '../../constants/climateData';
 import { formatTimeAgo } from '../../utils/formatTimeAgo';
 import { ClimateChangeIndicator } from '../UI/ClimateChangeIndicator';
+import { HealthRiskBadge } from '../UI/HealthRiskBadge';
 import { useMapStore } from '../../store/mapStore';
 import { FavoriteLocation, useFavoritesStore } from '../../store/favoritesStore';
 
@@ -39,7 +36,8 @@ export const HealthBottomSheet: React.FC = () => {
   const [timeAgoLabel, setTimeAgoLabel] = useState(() =>
     activeStat?.lastUpdated ? formatTimeAgo(activeStat.lastUpdated) : 'Unknown'
   );
-  const badgeColors = CATEGORY_BADGE_COLORS[activeStat?.category ?? ''] ?? DEFAULT_BADGE_COLORS;
+  const adviceText = activeStat?.advice ?? 'Health guidance unavailable for this reading.';
+  const isRiskLoading = regionInfo.loading && activeStat?.riskLevel === undefined;
 
   useEffect(() => {
     const ts = activeStat?.lastUpdated;
@@ -215,18 +213,25 @@ export const HealthBottomSheet: React.FC = () => {
               </Animated.View>
             </Pressable>
           </View>
-          <View style={[styles.riskBadge, { backgroundColor: badgeColors.bg }]}>
-            <Text style={[styles.riskBadgeText, { color: badgeColors.text }]}>
-              {formatBadgeText(activeStat?.value, activeStat?.unit, activeStat?.category, activeLayer)}
-            </Text>
-          </View>
+          <HealthRiskBadge
+            riskLevel={activeStat?.riskLevel}
+            adviceText={activeStat?.advice}
+            testID="health-risk-badge"
+          />
         </View>
 
-        {/* Health Advice Placeholder */}
         <View style={styles.adviceContainer}>
-          <Text style={styles.adviceText}>
-            Sensitive groups should reduce prolonged outdoor exertion today.
-          </Text>
+          {isRiskLoading ? (
+            <ActivityIndicator
+              size="small"
+              color="#717783"
+              testID="health-risk-advice-loading"
+            />
+          ) : (
+            <Text style={styles.adviceText}>
+              {adviceText}
+            </Text>
+          )}
         </View>
 
         <View style={styles.divider} />

@@ -3,6 +3,8 @@ export type ClimateLayer = 'pm25' | 'precipitation' | 'uv' | 'humidity' | 'tempe
 
 export type MapLevel = 'coarse' | 'ssc';
 
+export type HealthRiskLevel = 'Good' | 'Moderate' | 'Unhealthy' | 'Hazardous';
+
 export interface ClimateDataConfig {
   name: string;
   colorScale: string[];

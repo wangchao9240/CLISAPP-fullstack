@@ -11,6 +11,7 @@ import rasterio
 from rasterio.windows import Window
 
 from app.models.climate import CLIMATE_LAYER_CONFIGS, ClimateDataPoint, ClimateLayer
+from app.services.health_threshold_service import get_health_threshold_service
 
 
 @dataclass(frozen=True)
@@ -37,6 +38,7 @@ class ClimateDataService:
             Path(__file__).resolve().parents[2] / "data" / "processing"
         )
         self._tiles_path = Path(__file__).resolve().parents[2] / "tiles"
+        self._health_thresholds = get_health_threshold_service()
 
         self._order: List[ClimateLayer] = list(CLIMATE_LAYER_CONFIGS.keys())
         self._layers: Dict[ClimateLayer, _LayerSettings] = {
@@ -122,6 +124,10 @@ class ClimateDataService:
                 continue
 
             category = self._categorize(layer, value)
+            risk_level = self._health_thresholds.get_risk_level(layer.value, value)
+            advice: Optional[str] = None
+            if risk_level:
+                advice = self._health_thresholds.get_advice(layer.value, risk_level) or None
             results[layer.value] = ClimateDataPoint(
                 layer=layer,
                 value=round(value, layer_settings.precision),
@@ -129,6 +135,8 @@ class ClimateDataService:
                 timestamp=self._get_layer_timestamp(layer),
                 quality="estimated",
                 category=category,
+                risk_level=risk_level,
+                advice=advice,
             )
 
         return results

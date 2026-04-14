@@ -48,6 +48,8 @@ export interface RegionInfo {
     timestamp: string;
     quality?: string;
     category?: string;
+    risk_level?: string | null;
+    advice?: string | null;
   }>;
   last_updated?: string;
 }

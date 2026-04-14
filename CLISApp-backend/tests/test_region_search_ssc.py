@@ -1,8 +1,13 @@
 import asyncio
 import time
+from datetime import UTC, datetime
 
+from fastapi.testclient import TestClient
 from shapely.geometry import box
 
+from app.api.v1 import regions as regions_api
+from app.main import app
+from app.models.climate import ClimateDataPoint, ClimateLayer
 from app.models.region import Bounds, Coordinate
 from app.services.region_data_loader import RegionGeometry, RegionRecord
 from app.services.region_service import RegionService
@@ -219,3 +224,60 @@ def test_search_performance_under_one_second() -> None:
 
     assert [result.id for result in results] == ["ssc_20161"]
     assert elapsed < 1.0
+
+
+def test_by_coordinates_endpoint_includes_health_risk_and_advice(monkeypatch) -> None:
+    service = _make_service(
+        {
+            "ssc": [
+                _make_record(
+                    "ssc_20161",
+                    "Sunnybank Hills",
+                    "ssc",
+                    parent_region="Brisbane City",
+                )
+            ]
+        }
+    )
+
+    class EndpointClimateDataService:
+        def available_layers(self):
+            return [ClimateLayer.PM25]
+
+        def get_climate_at(self, latitude: float, longitude: float, layers=None):
+            return {}
+
+    class EndpointSscClimateService:
+        def get_climate_for_ssc(self, ssc_id: str):
+            assert ssc_id == "ssc_20161"
+            return {
+                "pm25": ClimateDataPoint(
+                    layer=ClimateLayer.PM25,
+                    value=35.0,
+                    unit="µg/m³",
+                    timestamp=datetime(2026, 3, 17, 12, 0, tzinfo=UTC),
+                    quality="estimated",
+                    category="Moderate",
+                    risk_level="Unhealthy",
+                    advice="Everyone should reduce outdoor activity.",
+                )
+            }
+
+    service.climate_service = EndpointClimateDataService()
+    service.ssc_climate_service = EndpointSscClimateService()
+    monkeypatch.setattr(regions_api, "region_service", service)
+
+    with TestClient(app) as client:
+        response = client.get(
+            "/api/v1/regions/by-coordinates",
+            params={
+                "lat": -27.55,
+                "lng": 153.05,
+                "include_climate_data": "true",
+            },
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["current_climate"]["pm25"]["risk_level"] == "Unhealthy"
+    assert payload["current_climate"]["pm25"]["advice"] == "Everyone should reduce outdoor activity."
