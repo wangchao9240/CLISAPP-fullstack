@@ -9,7 +9,13 @@ import {
 } from '../../constants/healthColors';
 import type { FavoriteLocation } from '../../store/favoritesStore';
 import type { RegionClimateOverview } from '../../types/region.types';
-import { getIndicatorState } from './ClimateChangeIndicator';
+import { getClimateDeltaState } from '../../utils/climateDelta';
+
+const VARIANT_ICONS: Record<string, { iconName: string; iconColor: string }> = {
+  warm: { iconName: 'arrow-top-right', iconColor: '#FF7043' },
+  cool: { iconName: 'arrow-bottom-right', iconColor: '#81D4FA' },
+  neutral: { iconName: 'approximately-equal', iconColor: '#78909C' },
+};
 
 interface FavoriteLocationCardProps {
   favorite: FavoriteLocation;
@@ -62,9 +68,12 @@ export const FavoriteLocationCard: React.FC<FavoriteLocationCardProps> = ({
   const badgeColors = category
     ? CATEGORY_BADGE_COLORS[category] ?? DEFAULT_BADGE_COLORS
     : DEFAULT_BADGE_COLORS;
-  const indicatorState = getIndicatorState(favorite.regionId, climate);
+  const deltaState = getClimateDeltaState(favorite.regionId, climate);
+  const variantIcon = VARIANT_ICONS[deltaState.variant] ?? null;
   const healthLabel = isClimateLoading ? 'Loading...' : category ?? 'No data';
-  const { iconName, iconColor, valueText } = indicatorState;
+  const iconName = variantIcon?.iconName ?? null;
+  const iconColor = variantIcon?.iconColor ?? null;
+  const valueText = deltaState.deltaLabel;
   const hasDelta = iconName != null && iconColor != null && valueText != null;
 
   const handleDelete = () => {
