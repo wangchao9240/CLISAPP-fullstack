@@ -14,16 +14,13 @@ jest.mock('../../../store/favoritesStore', () => ({
 
 jest.mock('@gorhom/bottom-sheet', () => {
   const React = require('react');
-
   const BottomSheetModal = React.forwardRef((props: any, ref: any) => {
     React.useImperativeHandle(ref, () => ({
       present: jest.fn(),
       dismiss: jest.fn(),
     }));
-
     return <>{props.children}</>;
   });
-
   return {
     BottomSheetModal,
     BottomSheetScrollView: ({ children }: any) => <>{children}</>,
@@ -33,7 +30,6 @@ jest.mock('@gorhom/bottom-sheet', () => {
 
 jest.mock('react-native-paper', () => {
   const React = require('react');
-
   return {
     ActivityIndicator: (props: any) => React.createElement('ActivityIndicator', props),
     Snackbar: (props: any) => React.createElement('Snackbar', props, props.children),
@@ -45,8 +41,15 @@ jest.mock('react-native-vector-icons/MaterialCommunityIcons', () => {
   return ({ name, ...props }: any) => <Text {...props}>{name}</Text>;
 });
 
-jest.mock('../../UI/ClimateChangeIndicator', () => ({
-  ClimateChangeIndicator: () => null,
+// BaselinePill and ClimateMetricsGrid render climate data — stub them so this
+// test focuses on the sheet's own assembly (region header, advice subtitle,
+// impact section) without duplicating their test coverage.
+jest.mock('../../UI/BaselinePill', () => ({
+  BaselinePill: () => null,
+}));
+
+jest.mock('../../UI/ClimateMetricsGrid', () => ({
+  ClimateMetricsGrid: () => null,
 }));
 
 const { useMapStore } = require('../../../store/mapStore') as typeof import('../../../store/mapStore');
@@ -83,13 +86,8 @@ const makeClimate = (): RegionClimateOverview => ({
   ],
 });
 
-const getTextNode = (renderer: ReturnType<typeof create>, expectedText: string) =>
-  renderer.root.findAllByType('Text' as any).find((node) => node.props.children === expectedText);
-
-const getBadgeNode = (renderer: ReturnType<typeof create>) =>
-  renderer.root.find(
-    (node) => node.props.testID === 'health-risk-badge' && Array.isArray(node.props.style),
-  );
+const findText = (renderer: ReturnType<typeof create>, text: string) =>
+  renderer.root.findAllByType('Text' as any).filter((node) => node.props.children === text);
 
 describe('HealthBottomSheet', () => {
   beforeEach(() => {
@@ -111,7 +109,7 @@ describe('HealthBottomSheet', () => {
     jest.useRealTimers();
   });
 
-  it('renders the health risk badge and advice for an Unhealthy PM2.5 reading', () => {
+  it("uses the worst-risk layer's advice as the header subtitle", () => {
     mockMapState = {
       regionInfo: {
         visible: true,
@@ -131,16 +129,16 @@ describe('HealthBottomSheet', () => {
 
     const renderer = create(<HealthBottomSheet />);
 
-    expect(getTextNode(renderer, 'Unhealthy')).toBeDefined();
-    expect(getTextNode(renderer, 'Everyone should reduce outdoor activity.')).toBeDefined();
-    expect(getBadgeNode(renderer).props.accessibilityLabel).toBe(
-      'Unhealthy air/health risk. Everyone should reduce outdoor activity.',
-    );
+    // Worst-risk is PM2.5 ("Unhealthy") → its advice is shown.
+    expect(findText(renderer, 'Everyone should reduce outdoor activity.').length).toBe(1);
+
+    // No HealthRiskBadge testID should exist in the redesigned sheet.
+    expect(renderer.root.findAllByProps({ testID: 'health-risk-badge' }).length).toBe(0);
 
     renderer.unmount();
   });
 
-  it('updates the badge and advice when the active layer changes', () => {
+  it('falls back to the active layer advice when no layer is above Good', () => {
     mockMapState = {
       regionInfo: {
         visible: true,
@@ -149,36 +147,42 @@ describe('HealthBottomSheet', () => {
         regionType: 'ssc',
         latitude: -27.5,
         longitude: 153.0,
-        climate: makeClimate(),
+        climate: {
+          primary: {
+            layer: 'pm25',
+            name: 'PM2.5',
+            value: 5,
+            unit: 'µg/m³',
+            riskLevel: 'Good',
+            advice: 'Air quality is great today.',
+            lastUpdated: '2026-03-17T12:00:00Z',
+          },
+          secondary: [
+            {
+              layer: 'uv',
+              name: 'UV',
+              value: 2,
+              unit: 'UVI',
+              riskLevel: 'Good',
+              advice: 'Enjoy the sunshine.',
+            },
+          ],
+        },
         loading: false,
         error: null,
       },
-      activeLayer: 'pm25',
-      closeRegionInfo: jest.fn(),
-      clearRegionInfo: jest.fn(),
-    };
-
-    const renderer = create(<HealthBottomSheet />);
-
-    mockMapState = {
-      ...mockMapState,
       activeLayer: 'uv',
+      closeRegionInfo: jest.fn(),
+      clearRegionInfo: jest.fn(),
     };
 
-    act(() => {
-      renderer.update(<HealthBottomSheet />);
-    });
+    const renderer = create(<HealthBottomSheet />);
 
-    expect(getTextNode(renderer, 'Good')).toBeDefined();
-    expect(getTextNode(renderer, 'Enjoy outdoor activity as usual.')).toBeDefined();
-    expect(getBadgeNode(renderer).props.accessibilityLabel).toBe(
-      'Good air/health risk. Enjoy outdoor activity as usual.',
-    );
-
+    expect(findText(renderer, 'Enjoy the sunshine.').length).toBe(1);
     renderer.unmount();
   });
 
-  it('renders the loading fallback without throwing when climate data is unavailable', () => {
+  it('shows the generic fallback subtitle when no climate data is available', () => {
     mockMapState = {
       regionInfo: {
         visible: true,
@@ -198,9 +202,54 @@ describe('HealthBottomSheet', () => {
 
     const renderer = create(<HealthBottomSheet />);
 
-    expect(getTextNode(renderer, 'Unknown')).toBeDefined();
-    expect(renderer.root.findByProps({ testID: 'health-risk-advice-loading' })).toBeDefined();
+    expect(findText(renderer, 'Conditions are within expected ranges.').length).toBe(1);
+    renderer.unmount();
+  });
 
+  it('updates the advice subtitle when the climate data changes', () => {
+    mockMapState = {
+      regionInfo: {
+        visible: true,
+        regionId: 'ssc_10001',
+        regionName: 'Alpha Plains',
+        regionType: 'ssc',
+        latitude: -27.5,
+        longitude: 153.0,
+        climate: makeClimate(),
+        loading: false,
+        error: null,
+      },
+      activeLayer: 'pm25',
+      closeRegionInfo: jest.fn(),
+      clearRegionInfo: jest.fn(),
+    };
+
+    const renderer = create(<HealthBottomSheet />);
+    expect(findText(renderer, 'Everyone should reduce outdoor activity.').length).toBe(1);
+
+    mockMapState = {
+      ...mockMapState,
+      regionInfo: {
+        ...mockMapState.regionInfo,
+        climate: {
+          primary: {
+            layer: 'uv',
+            name: 'UV',
+            value: 9,
+            unit: 'UVI',
+            riskLevel: 'Hazardous',
+            advice: 'Seek shade immediately.',
+          },
+          secondary: [],
+        },
+      },
+    };
+
+    act(() => {
+      renderer.update(<HealthBottomSheet />);
+    });
+
+    expect(findText(renderer, 'Seek shade immediately.').length).toBe(1);
     renderer.unmount();
   });
 });
