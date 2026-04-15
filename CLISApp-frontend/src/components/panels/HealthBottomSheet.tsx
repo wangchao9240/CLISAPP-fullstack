@@ -5,16 +5,22 @@ import {
   BottomSheetScrollView,
   BottomSheetBackdrop,
 } from '@gorhom/bottom-sheet';
-import { ActivityIndicator, Snackbar } from 'react-native-paper';
+import { Snackbar } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { getActiveClimateStat } from '../../constants/climateData';
 import { formatTimeAgo } from '../../utils/formatTimeAgo';
-import { ClimateChangeIndicator } from '../UI/ClimateChangeIndicator';
-import { HealthRiskBadge } from '../UI/HealthRiskBadge';
+import { getActiveClimateStat } from '../../constants/climateData';
+import { getWorstRiskStat } from '../../utils/riskPriority';
+import { BaselinePill } from '../UI/BaselinePill';
+import { ClimateMetricsGrid } from '../UI/ClimateMetricsGrid';
+import {
+  HEALTH_SHEET_COLORS,
+  IMPACT_COLORS,
+} from '../../constants/healthDesignTokens';
 import { useMapStore } from '../../store/mapStore';
 import { FavoriteLocation, useFavoritesStore } from '../../store/favoritesStore';
 
 const SNAP_POINTS = ['40%', '60%', '85%'];
+const DEFAULT_ADVICE_FALLBACK = 'Conditions are within expected ranges.';
 
 export const HealthBottomSheet: React.FC = () => {
   const bottomSheetRef = useRef<BottomSheetModal>(null);
@@ -22,38 +28,37 @@ export const HealthBottomSheet: React.FC = () => {
   const [deletedFavorite, setDeletedFavorite] = useState<FavoriteLocation | null>(null);
   const [isSnackbarVisible, setIsSnackbarVisible] = useState(false);
 
-  const {
-    regionInfo,
-    activeLayer,
-    closeRegionInfo,
-    clearRegionInfo,
-  } = useMapStore();
+  const { regionInfo, activeLayer, closeRegionInfo, clearRegionInfo } = useMapStore();
 
-  const { isFavorite, addFavorite, restoreFavorite, removeFavorite, getFavorite } = useFavoritesStore();
+  const { isFavorite, addFavorite, restoreFavorite, removeFavorite, getFavorite } =
+    useFavoritesStore();
 
   const snapPoints = useMemo(() => SNAP_POINTS, []);
+
+  const worstRisk = getWorstRiskStat(regionInfo.climate);
   const activeStat = getActiveClimateStat(regionInfo.climate, activeLayer);
+
+  // Advice subtitle priority: worst-risk advice → active-layer advice → fallback.
+  const adviceText =
+    worstRisk?.advice ?? activeStat?.advice ?? DEFAULT_ADVICE_FALLBACK;
+
+  const timestampSource =
+    worstRisk?.lastUpdated ?? activeStat?.lastUpdated ?? null;
   const [timeAgoLabel, setTimeAgoLabel] = useState(() =>
-    activeStat?.lastUpdated ? formatTimeAgo(activeStat.lastUpdated) : 'Unknown'
+    timestampSource ? formatTimeAgo(timestampSource) : 'Unknown',
   );
-  const adviceText = activeStat?.advice ?? 'Health guidance unavailable for this reading.';
-  const isRiskLoading = regionInfo.loading && activeStat?.riskLevel === undefined;
 
   useEffect(() => {
-    const ts = activeStat?.lastUpdated;
-    if (!ts || !regionInfo.visible) {
-      setTimeAgoLabel(ts ? formatTimeAgo(ts) : 'Unknown');
+    if (!timestampSource || !regionInfo.visible) {
+      setTimeAgoLabel(timestampSource ? formatTimeAgo(timestampSource) : 'Unknown');
       return;
     }
-
-    setTimeAgoLabel(formatTimeAgo(ts));
-
+    setTimeAgoLabel(formatTimeAgo(timestampSource));
     const interval = setInterval(() => {
-      setTimeAgoLabel(formatTimeAgo(ts));
+      setTimeAgoLabel(formatTimeAgo(timestampSource));
     }, 60_000);
-
     return () => clearInterval(interval);
-  }, [activeStat?.lastUpdated, regionInfo.visible]);
+  }, [timestampSource, regionInfo.visible]);
 
   const animateHeart = useCallback(() => {
     Animated.spring(heartScale, {
@@ -73,7 +78,6 @@ export const HealthBottomSheet: React.FC = () => {
 
   const prevRegionIdRef = useRef(regionInfo.regionId);
 
-  // Sync visibility with store
   useEffect(() => {
     if (regionInfo.visible) {
       bottomSheetRef.current?.present();
@@ -84,7 +88,6 @@ export const HealthBottomSheet: React.FC = () => {
     }
   }, [regionInfo.visible]);
 
-  // Clear stale snackbar when region changes
   useEffect(() => {
     if (prevRegionIdRef.current !== regionInfo.regionId) {
       setIsSnackbarVisible(false);
@@ -95,26 +98,18 @@ export const HealthBottomSheet: React.FC = () => {
 
   const handleSheetChanges = useCallback(
     (index: number) => {
-      if (index === -1 && regionInfo.visible) {
-        closeRegionInfo();
-      }
+      if (index === -1 && regionInfo.visible) closeRegionInfo();
     },
-    [regionInfo.visible, closeRegionInfo]
+    [regionInfo.visible, closeRegionInfo],
   );
 
   const handleSheetDismiss = useCallback(() => {
-    if (!useMapStore.getState().regionInfo.visible) {
-      clearRegionInfo();
-    }
+    if (!useMapStore.getState().regionInfo.visible) clearRegionInfo();
   }, [clearRegionInfo]);
 
   const handleFavoriteToggle = useCallback(() => {
-    if (!regionInfo.regionId || !regionInfo.regionName) {
-      return;
-    }
-
+    if (!regionInfo.regionId || !regionInfo.regionName) return;
     animateHeart();
-
     if (isFavorite(regionInfo.regionId)) {
       const favoriteToRemove =
         getFavorite(regionInfo.regionId) ?? {
@@ -125,7 +120,6 @@ export const HealthBottomSheet: React.FC = () => {
           longitude: regionInfo.longitude ?? undefined,
           timestamp: new Date().toISOString(),
         };
-
       setDeletedFavorite(favoriteToRemove);
       removeFavorite(regionInfo.regionId);
       setIsSnackbarVisible(true);
@@ -155,10 +149,7 @@ export const HealthBottomSheet: React.FC = () => {
   ]);
 
   const handleUndoFavorite = useCallback(() => {
-    if (!deletedFavorite) {
-      return;
-    }
-
+    if (!deletedFavorite) return;
     restoreFavorite(deletedFavorite);
     setDeletedFavorite(null);
     setIsSnackbarVisible(false);
@@ -181,7 +172,7 @@ export const HealthBottomSheet: React.FC = () => {
         pressBehavior="close"
       />
     ),
-    []
+    [],
   );
 
   return (
@@ -197,118 +188,67 @@ export const HealthBottomSheet: React.FC = () => {
       handleIndicatorStyle={styles.dragHandle}
     >
       <BottomSheetScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Header Row */}
+        {/* Region header */}
         <View style={styles.headerRow}>
-          <View style={styles.titleContainer}>
-            <Text style={styles.regionName}>
+          <View style={styles.headerTextColumn}>
+            <Text style={styles.regionName} numberOfLines={2}>
               {regionInfo.regionName || 'Selected Region'}
             </Text>
-            <Pressable onPress={handleFavoriteToggle} style={styles.favoriteButton}>
-              <Animated.View style={[styles.favoriteIconContainer, { transform: [{ scale: heartScale }] }]}>
-                <Icon
-                  name={isFav ? 'cards-heart' : 'cards-heart-outline'}
-                  size={24}
-                  color={isFav ? '#ba1a1a' : '#414752'}
-                />
-              </Animated.View>
-            </Pressable>
-          </View>
-          <HealthRiskBadge
-            riskLevel={activeStat?.riskLevel}
-            adviceText={activeStat?.advice}
-            testID="health-risk-badge"
-          />
-        </View>
-
-        <View style={styles.adviceContainer}>
-          {isRiskLoading ? (
-            <ActivityIndicator
-              size="small"
-              color="#717783"
-              testID="health-risk-advice-loading"
-            />
-          ) : (
-            <Text style={styles.adviceText}>
+            <Text
+              style={styles.adviceSubtitle}
+              testID="health-advice-subtitle"
+              numberOfLines={3}
+            >
               {adviceText}
             </Text>
-          )}
+          </View>
+          <Pressable
+            onPress={handleFavoriteToggle}
+            style={styles.favoriteButton}
+            hitSlop={10}
+          >
+            <Animated.View style={{ transform: [{ scale: heartScale }] }}>
+              <Icon
+                name={isFav ? 'cards-heart' : 'cards-heart-outline'}
+                size={24}
+                color={isFav ? '#ba1a1a' : HEALTH_SHEET_COLORS.onSurfaceVariant}
+              />
+            </Animated.View>
+          </Pressable>
         </View>
 
-        <View style={styles.divider} />
-
-        {/* Half Level Content - Climate Change Indicator */}
-        <ClimateChangeIndicator
-          regionSscId={regionInfo.regionId}
-          climate={regionInfo.climate}
-        />
-
-        {/* Current Layer Data Section */}
-        <View style={styles.layerDataCard}>
-          <View style={styles.layerDataHeader}>
-            <Text style={styles.layerDataTitle}>
-              {activeLayer === 'pm25' ? 'PM2.5' :
-               activeLayer === 'uv' ? 'UV' :
-               activeLayer === 'temperature' ? 'Temperature' :
-               activeLayer === 'humidity' ? 'Humidity' :
-               activeLayer === 'precipitation' ? 'Precipitation' : 'Layer'} Details
-            </Text>
-            <Text style={styles.layerDataValue}>35 ug/m3</Text>
+        {/* Current Conditions section */}
+        <View style={styles.currentConditionsSection}>
+          <View style={styles.currentConditionsHeader}>
+            <Text style={styles.sectionLabel}>CURRENT CONDITIONS</Text>
+            <BaselinePill
+              regionSscId={regionInfo.regionId}
+              climate={regionInfo.climate}
+            />
           </View>
-          
-          <View style={styles.layerDataRow}>
-            <Text style={styles.layerDataLabel}>Daily average</Text>
-            <Text style={styles.layerDataSubValue}>28 ug/m3</Text>
-          </View>
-          <View style={styles.layerDataRow}>
-            <Text style={styles.layerDataLabel}>Peak today</Text>
-            <Text style={styles.layerDataSubValue}>42 ug/m3</Text>
-          </View>
-          <View style={styles.progressBarContainer}>
-            <View style={[styles.progressBarFill, { width: '65%' }]} />
-          </View>
+          <ClimateMetricsGrid climate={regionInfo.climate} />
         </View>
 
-        <View style={styles.dividerLarge} />
-
-        {/* Full Level Content - Health Impact Data */}
+        {/* Health Impact Data */}
         <View style={styles.impactSection}>
           <View style={styles.impactSectionHeader}>
-            <Icon name="google-analytics" size={20} color="#005dac" />
-            <Text style={styles.impactSectionTitle}>Health Impact Data</Text>
+            <Icon name="chart-timeline-variant" size={20} color={HEALTH_SHEET_COLORS.outline} />
+            <Text style={styles.impactSectionTitle}>HEALTH IMPACT DATA</Text>
           </View>
-
-          {/* Respiratory Hospitalizations Card */}
           <View style={styles.impactCard}>
             <View style={styles.impactCardTop}>
-              <View style={styles.impactCardTitleContainer}>
-                <View style={[styles.iconCircle, { backgroundColor: '#E573731A' }]}>
-                  <Icon name="lungs" size={20} color="#E57373" />
-                </View>
-                <Text style={styles.impactCardTitle}>Respiratory{'\n'}Hospitalizations</Text>
-              </View>
-              <View style={[styles.statusBadge, { backgroundColor: '#FF8A651A' }]}>
-                <Icon name="arrow-up" size={12} color="#FF8A65" />
-                <Text style={[styles.statusBadgeText, { color: '#FF8A65' }]}>Elevated</Text>
-              </View>
+              <Text style={styles.impactCardTitle}>Respiratory Hospitalizations</Text>
+              <Text style={[styles.impactStatus, { color: IMPACT_COLORS.elevated }]}>ELEVATED</Text>
             </View>
             <Text style={styles.impactCardText}>
-              PM2.5 levels of 35 ug/m3 correlate with <Text style={styles.textBold}>15% higher</Text> respiratory admission rates.
+              PM2.5 levels of 35 µg/m³ correlate with{' '}
+              <Text style={styles.textBold}>15% higher</Text> respiratory admission rates.
             </Text>
           </View>
-
-          {/* Cardiovascular Hospitalizations Card */}
           <View style={styles.impactCard}>
             <View style={styles.impactCardTop}>
-              <View style={styles.impactCardTitleContainer}>
-                <View style={[styles.iconCircle, { backgroundColor: '#E573731A' }]}>
-                  <Icon name="heart-pulse" size={20} color="#E57373" />
-                </View>
-                <Text style={styles.impactCardTitle}>Cardiovascular{'\n'}Hospitalizations</Text>
-              </View>
-              <View style={[styles.statusBadge, { backgroundColor: '#FDD8351A' }]}>
-                <Icon name="minus" size={12} color="#FDD835" />
-                <Text style={[styles.statusBadgeText, { color: '#FDD835' }]}>Moderate</Text>
-              </View>
+              <Text style={styles.impactCardTitle}>Cardiovascular Hospitalizations</Text>
+              <Text style={[styles.impactStatus, { color: HEALTH_SHEET_COLORS.outline }]}>MODERATE</Text>
             </View>
             <Text style={styles.impactCardText}>
               Current levels associated with marginally elevated cardiovascular risk factors.
@@ -319,7 +259,9 @@ export const HealthBottomSheet: React.FC = () => {
         {/* Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>Data source: Open-Meteo API | Aggregated health data</Text>
-          <Text style={[styles.footerText, styles.footerTextBold]}>Last updated: {timeAgoLabel}</Text>
+          <Text style={[styles.footerText, styles.footerTextBold]}>
+            Last updated: {timeAgoLabel}
+          </Text>
         </View>
       </BottomSheetScrollView>
       <Snackbar
@@ -327,10 +269,7 @@ export const HealthBottomSheet: React.FC = () => {
         onDismiss={handleDismissSnackbar}
         duration={3000}
         wrapperStyle={styles.snackbarWrapper}
-        action={{
-          label: 'Undo',
-          onPress: handleUndoFavorite,
-        }}
+        action={{ label: 'Undo', onPress: handleUndoFavorite }}
       >
         Deleted
       </Snackbar>
@@ -340,7 +279,7 @@ export const HealthBottomSheet: React.FC = () => {
 
 const styles = StyleSheet.create({
   sheetBackground: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: HEALTH_SHEET_COLORS.surface,
     borderRadius: 24,
     ...Platform.select({
       ios: {
@@ -349,15 +288,13 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.06,
         shadowRadius: 32,
       },
-      android: {
-        elevation: 16,
-      },
+      android: { elevation: 16 },
     }),
   },
   dragHandle: {
     width: 32,
     height: 4,
-    backgroundColor: '#C1C6D4',
+    backgroundColor: HEALTH_SHEET_COLORS.outlineVariant,
     borderRadius: 2,
     marginTop: 8,
   },
@@ -366,174 +303,101 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   headerRow: {
-    paddingTop: 8,
-    gap: 12,
-    marginBottom: 12,
-  },
-  titleContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
+    paddingTop: 16,
+    marginBottom: 24,
+    gap: 12,
+  },
+  headerTextColumn: {
+    flex: 1,
+    minWidth: 0,
   },
   regionName: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#181C21',
+    color: HEALTH_SHEET_COLORS.onSurface,
     letterSpacing: -0.5,
+    marginBottom: 4,
+  },
+  adviceSubtitle: {
+    fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 18,
+    color: HEALTH_SHEET_COLORS.onSurfaceVariant,
+    opacity: 0.8,
   },
   favoriteButton: {
-    padding: 4,
+    padding: 8,
+    marginTop: -8,
   },
-  favoriteIconContainer: {
+  currentConditionsSection: {
+    marginBottom: 32,
+  },
+  currentConditionsHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  riskBadge: {
-    backgroundColor: '#FFDBC7',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 16,
-    alignSelf: 'flex-start',
-  },
-  riskBadgeText: {
-    color: '#733600',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: -0.2,
-  },
-  adviceContainer: {
-    backgroundColor: '#F2F3FC',
-    padding: 16,
-    borderRadius: 12,
+    justifyContent: 'space-between',
     marginBottom: 24,
   },
-  adviceText: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#414752',
-    fontWeight: '500',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(193, 198, 212, 0.3)',
-    marginBottom: 24,
-  },
-  dividerLarge: {
-    height: 1,
-    backgroundColor: 'rgba(193, 198, 212, 0.2)',
-    marginVertical: 32,
-  },
-  layerDataCard: {
-    backgroundColor: '#F9F9FF', // surface - tonal layering instead of border
-    borderRadius: 12,
-    padding: 20,
-  },
-  layerDataHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  layerDataTitle: {
-    fontSize: 16,
+  sectionLabel: {
+    fontSize: 11,
     fontWeight: '700',
-    color: '#181C21',
-  },
-  layerDataValue: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#005dac',
-  },
-  layerDataRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  layerDataLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#717783',
-  },
-  layerDataSubValue: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#414752',
-  },
-  progressBarContainer: {
-    width: '100%',
-    height: 8,
-    backgroundColor: '#E0E2EA',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginTop: 8,
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: '#944700',
+    textTransform: 'uppercase',
+    color: HEALTH_SHEET_COLORS.outline,
+    letterSpacing: 1,
   },
   impactSection: {
+    paddingTop: 16,
     gap: 16,
   },
   impactSectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 4,
+    marginBottom: 8,
   },
   impactSectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#181C21',
+    fontSize: 15,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    color: HEALTH_SHEET_COLORS.outline,
   },
   impactCard: {
-    backgroundColor: '#F9F9FF', // surface - tonal layering instead of border
+    backgroundColor: 'rgba(242, 243, 252, 0.5)',
     borderRadius: 16,
-    padding: 20,
-    gap: 16,
+    padding: 24,
+    gap: 12,
   },
   impactCardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-  },
-  impactCardTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  iconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    gap: 8,
   },
   impactCardTitle: {
+    fontSize: 16,
     fontWeight: '700',
-    color: '#181C21',
+    color: HEALTH_SHEET_COLORS.onSurface,
     lineHeight: 20,
+    flexShrink: 1,
   },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  statusBadgeText: {
-    fontSize: 12,
+  impactStatus: {
+    fontSize: 11,
     fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   impactCardText: {
     fontSize: 14,
-    color: '#414752',
     lineHeight: 22,
+    color: HEALTH_SHEET_COLORS.onSurfaceVariant,
   },
   textBold: {
     fontWeight: '700',
-    color: '#181C21',
+    color: HEALTH_SHEET_COLORS.onSurface,
   },
   footer: {
     marginTop: 32,
@@ -542,7 +406,7 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 11,
-    color: '#717783',
+    color: HEALTH_SHEET_COLORS.outline,
     lineHeight: 14,
   },
   footerTextBold: {
