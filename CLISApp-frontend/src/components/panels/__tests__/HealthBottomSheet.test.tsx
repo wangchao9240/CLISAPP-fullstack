@@ -58,8 +58,8 @@ const { useFavoritesStore } =
 const { HealthBottomSheet } =
   require('../HealthBottomSheet') as typeof import('../HealthBottomSheet');
 
-const mockUseMapStore = useMapStore as jest.Mock;
-const mockUseFavoritesStore = useFavoritesStore as jest.Mock;
+const mockUseMapStore = useMapStore as unknown as jest.Mock;
+const mockUseFavoritesStore = useFavoritesStore as unknown as jest.Mock;
 
 const makeClimate = (): RegionClimateOverview => ({
   primary: {
