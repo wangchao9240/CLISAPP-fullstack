@@ -161,9 +161,9 @@ local.properties
 logs/
 
 # Large data files
-CLISApp-frontend/src/assets/geodata/geodata.geojson
-CLISApp-frontend/src/assets/geodata/geodata.json
-CLISApp-frontend/android/app/google-services.json
+# CLISApp-frontend/src/assets/geodata/geodata.geojson
+# CLISApp-frontend/src/assets/geodata/geodata.json
+# CLISApp-frontend/android/app/google-services.json
 CLISApp-backend/data/firebase-service-account.json
 
 # Backend data directories
