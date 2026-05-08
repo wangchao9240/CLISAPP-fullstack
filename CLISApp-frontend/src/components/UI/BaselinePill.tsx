@@ -1,8 +1,14 @@
 // CLISApp-frontend/src/components/UI/BaselinePill.tsx
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { DELTA_COLORS, HEALTH_SHEET_COLORS } from '../../constants/healthDesignTokens';
-import { getClimateDeltaState, ClimateDeltaVariant } from '../../utils/climateDelta';
+import {
+  DELTA_COLORS,
+  HEALTH_SHEET_COLORS,
+} from '../../constants/healthDesignTokens';
+import {
+  getClimateDeltaState,
+  ClimateDeltaVariant,
+} from '../../utils/climateDelta';
 import type { RegionClimateOverview } from '../../types/region.types';
 
 interface BaselinePillProps {
@@ -17,7 +23,10 @@ const VARIANT_COLOR: Record<ClimateDeltaVariant, string> = {
   unavailable: DELTA_COLORS.neutral,
 };
 
-export const BaselinePill: React.FC<BaselinePillProps> = ({ regionSscId, climate }) => {
+export const BaselinePill: React.FC<BaselinePillProps> = ({
+  regionSscId,
+  climate,
+}) => {
   const state = getClimateDeltaState(regionSscId, climate);
   const deltaColor = VARIANT_COLOR[state.variant];
 
@@ -32,7 +41,9 @@ export const BaselinePill: React.FC<BaselinePillProps> = ({ regionSscId, climate
       }
     >
       {state.deltaLabel ? (
-        <Text style={[styles.delta, { color: deltaColor }]}>{state.deltaLabel}</Text>
+        <Text style={[styles.delta, { color: deltaColor }]}>
+          {state.deltaLabel}
+        </Text>
       ) : null}
       <Text style={styles.subtitle}>{state.subtitleText}</Text>
     </View>
@@ -52,7 +63,7 @@ const styles = StyleSheet.create({
   delta: {
     fontSize: 18,
     fontWeight: '900',
-    letterSpacing: -0.4,
+    letterSpacing: 0,
   },
   subtitle: {
     fontSize: 9,

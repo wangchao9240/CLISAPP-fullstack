@@ -11,6 +11,7 @@ import { formatTimeAgo } from '../../utils/formatTimeAgo';
 import { getActiveClimateStat } from '../../constants/climateData';
 import { getWorstRiskStat } from '../../utils/riskPriority';
 import { BaselinePill } from '../UI/BaselinePill';
+import { RainfallTypicalPill } from '../UI/RainfallTypicalPill';
 import { ClimateMetricsGrid } from '../UI/ClimateMetricsGrid';
 import {
   HEALTH_SHEET_COLORS,
@@ -221,10 +222,13 @@ export const HealthBottomSheet: React.FC = () => {
         <View style={styles.currentConditionsSection}>
           <View style={styles.currentConditionsHeader}>
             <Text style={styles.sectionLabel}>CURRENT CONDITIONS</Text>
-            <BaselinePill
-              regionSscId={regionInfo.regionId}
-              climate={regionInfo.climate}
-            />
+            <View style={styles.baselinePillStack}>
+              <BaselinePill
+                regionSscId={regionInfo.regionId}
+                climate={regionInfo.climate}
+              />
+              <RainfallTypicalPill regionSscId={regionInfo.regionId} />
+            </View>
           </View>
           <ClimateMetricsGrid climate={regionInfo.climate} />
         </View>
@@ -337,9 +341,10 @@ const styles = StyleSheet.create({
   },
   currentConditionsHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     marginBottom: 24,
+    gap: 12,
   },
   sectionLabel: {
     fontSize: 11,
@@ -347,6 +352,12 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: HEALTH_SHEET_COLORS.outline,
     letterSpacing: 1,
+    marginTop: 8,
+  },
+  baselinePillStack: {
+    alignItems: 'flex-end',
+    flexShrink: 1,
+    gap: 8,
   },
   impactSection: {
     paddingTop: 16,
