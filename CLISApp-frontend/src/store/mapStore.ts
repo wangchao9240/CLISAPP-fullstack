@@ -15,6 +15,13 @@ interface RegionBoundaryData {
   properties?: any;
 }
 
+export interface RecentRegion {
+  id: string;
+  name: string;
+}
+
+const MAX_RECENT_REGIONS = 5;
+
 interface MapState {
   region: Region;
   activeLayer: ClimateLayer;
@@ -25,6 +32,9 @@ interface MapState {
   error?: string;
   regionInfo: RegionInfoPanelState;
   regionBoundary: RegionBoundaryData | null;
+  recentRegions: RecentRegion[];
+  /** Ephemeral — current snap index of the bottom sheet (-1 = dismissed). Never persisted. */
+  bottomSheetSnapIndex: number;
   setRegion: (region: Region) => void;
   setActiveLayer: (layer: ClimateLayer) => void;
   setMapLevel: (level: MapLevel) => void;
@@ -33,6 +43,7 @@ interface MapState {
   setLoading: (loading: boolean) => void;
   setTileLoadingProgress: (progress: number) => void;
   setError: (error?: string) => void;
+  setBottomSheetSnapIndex: (index: number) => void;
   openRegionInfo: (payload: {
     regionId: string;
     regionName: string;
@@ -46,10 +57,11 @@ interface MapState {
   setRegionInfoLoading: (loading: boolean) => void;
   setRegionInfoError: (error?: string) => void;
   setRegionBoundary: (boundary: RegionBoundaryData | null) => void;
+  pushRecentRegion: (region: RecentRegion) => void;
   resetMapState: () => void;
 }
 
-const MAP_STORE_VERSION = 3;
+const MAP_STORE_VERSION = 4;
 
 export const useMapStore = create<MapState>()(
   persist(
@@ -62,6 +74,8 @@ export const useMapStore = create<MapState>()(
       tileLoadingProgress: 0,
       error: undefined,
       regionBoundary: null,
+      recentRegions: [],
+      bottomSheetSnapIndex: -1,
       regionInfo: {
         visible: false,
         regionId: null,
@@ -135,6 +149,13 @@ export const useMapStore = create<MapState>()(
           },
         })),
       setRegionBoundary: (boundary) => set({ regionBoundary: boundary }),
+      setBottomSheetSnapIndex: (index) => set({ bottomSheetSnapIndex: index }),
+      pushRecentRegion: (region) =>
+        set((state) => {
+          const filtered = state.recentRegions.filter((r) => r.id !== region.id);
+          const updated = [region, ...filtered].slice(0, MAX_RECENT_REGIONS);
+          return { recentRegions: updated };
+        }),
       resetMapState: () =>
         set({
           region: QUEENSLAND_REGION,
@@ -145,6 +166,8 @@ export const useMapStore = create<MapState>()(
           tileLoadingProgress: 0,
           error: undefined,
           regionBoundary: null,
+          recentRegions: [],
+          bottomSheetSnapIndex: -1,
           regionInfo: {
             visible: false,
             regionId: null,
@@ -181,10 +204,12 @@ export const useMapStore = create<MapState>()(
           ...persistedState,
           ...(persistedMapLevel ? { mapLevel: persistedMapLevel } : {}),
           activeLayer: DEFAULT_LAYER,
+          recentRegions: persistedState.recentRegions ?? [],
         };
       },
       partialize: (state) => ({
         selectedRegionId: state.selectedRegionId,
+        recentRegions: state.recentRegions,
       }),
     }
   )

@@ -1,7 +1,8 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Animated } from 'react-native';
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useMapStore } from '../../store/mapStore';
 import { ClimateLayer } from '../../types/climate.types';
+import { PALETTE, RADII } from '../../constants/designTokens';
 
 const LAYERS: ReadonlyArray<{ key: ClimateLayer; label: string }> = [
   { key: 'pm25', label: 'PM2.5' },
@@ -16,83 +17,94 @@ interface LayerBarProps {
 }
 
 export const LayerBar: React.FC<LayerBarProps> = ({ visible = true }) => {
-  const { activeLayer, setActiveLayer, regionInfo } = useMapStore();
-
+  const { activeLayer, setActiveLayer } = useMapStore();
 
   if (!visible) {
     return null;
   }
 
   return (
-    <Animated.View style={[styles.container, { bottom: 0 }]}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
+    <View style={styles.container}>
+      <View style={styles.card}>
         {LAYERS.map((layer) => {
           const isActive = activeLayer === layer.key;
           return (
             <TouchableOpacity
               key={layer.key}
-              style={[styles.pill, isActive ? styles.pillActive : styles.pillInactive]}
+              style={[styles.chip, isActive ? styles.chipActive : styles.chipInactive]}
               onPress={() => setActiveLayer(layer.key as any)}
               accessibilityRole="button"
               accessibilityState={{ selected: isActive }}
               accessibilityLabel={`${layer.label} layer`}
             >
-              <Text style={[styles.pillText, isActive ? styles.pillTextActive : styles.pillTextInactive]}>
+              <Text style={[styles.chipText, isActive ? styles.chipTextActive : styles.chipTextInactive]}>
                 {layer.label}
               </Text>
             </TouchableOpacity>
           );
         })}
-      </ScrollView>
-    </Animated.View>
+      </View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 80, // Right above the 80px bottom nav by default
+    bottom: 12,
     left: 0,
     right: 0,
-    height: 56,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
     zIndex: 1000,
     elevation: 1000,
+    pointerEvents: 'box-none',
   },
-  scrollContent: {
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    gap: 8,
+  card: {
+    flexDirection: 'row',
+    backgroundColor: PALETTE.surface,
+    borderRadius: RADII.card,
+    padding: 7,
+    borderWidth: 1,
+    borderColor: PALETTE.border,
+    gap: 4,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#0D1220',
+        shadowOpacity: 0.10,
+        shadowOffset: { width: 0, height: 12 },
+        shadowRadius: 16,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+    pointerEvents: 'auto',
   },
-  pill: {
-    height: 32,
-    paddingHorizontal: 16,
-    borderRadius: 9999,
+  chip: {
+    flex: 1,
+    borderRadius: RADII.chip,
+    paddingVertical: 9,
+    paddingHorizontal: 6,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  pillActive: {
-    backgroundColor: '#FFFFFF',
+  chipActive: {
+    backgroundColor: PALETTE.fg,
   },
-  pillInactive: {
+  chipInactive: {
     backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
   },
-  pillText: {
-    fontSize: 14,
+  chipText: {
+    fontSize: 12.5,
     fontWeight: '500',
-    letterSpacing: 0.5,
+    letterSpacing: -0.0625,
   },
-  pillTextActive: {
-    color: '#1E293B', // slate-900
-  },
-  pillTextInactive: {
+  chipTextActive: {
     color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  chipTextInactive: {
+    color: PALETTE.muted,
   },
 });

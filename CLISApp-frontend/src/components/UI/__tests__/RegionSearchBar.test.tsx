@@ -1,6 +1,11 @@
 import React from 'react';
 import { act, create } from 'react-test-renderer';
 
+jest.mock('react-native-vector-icons/MaterialCommunityIcons', () => {
+  const { Text } = require('react-native');
+  return ({ name, ...props }: any) => <Text {...props}>{name}</Text>;
+});
+
 jest.mock('../../../hooks/useApi', () => ({
   useRegionSearch: jest.fn(),
   formatClimateOverview: jest.fn(),
@@ -13,26 +18,24 @@ jest.mock('../../../store/mapStore', () => ({
 jest.mock('../../../services/ApiService', () => ({
   apiService: {
     getRegionInfo: jest.fn(),
-    getRegionBoundary: jest.fn(),
   },
 }));
 
-jest.mock('../../../services/boundaries/BoundaryStore', () => ({
-  convertGeometryToShapes: jest.fn(),
+jest.mock('../../../services/boundaries/boundaryLoader', () => ({
+  loadRegionBoundary: jest.fn(),
 }));
 
 const { RegionSearchBar } = require('../RegionSearchBar');
 const { useRegionSearch, formatClimateOverview } = require('../../../hooks/useApi');
 const { useMapStore } = require('../../../store/mapStore');
 const { apiService } = require('../../../services/ApiService');
-const { convertGeometryToShapes } = require('../../../services/boundaries/BoundaryStore');
+const { loadRegionBoundary } = require('../../../services/boundaries/boundaryLoader');
 
 const mockUseRegionSearch = useRegionSearch as jest.Mock;
 const mockFormatClimateOverview = formatClimateOverview as jest.Mock;
 const mockUseMapStore = useMapStore as jest.Mock;
 const mockGetRegionInfo = apiService.getRegionInfo as jest.Mock;
-const mockGetRegionBoundary = apiService.getRegionBoundary as jest.Mock;
-const mockConvertGeometryToShapes = convertGeometryToShapes as jest.Mock;
+const mockLoadRegionBoundary = loadRegionBoundary as jest.Mock;
 
 describe('RegionSearchBar', () => {
   beforeEach(() => {
@@ -45,6 +48,7 @@ describe('RegionSearchBar', () => {
   it('ignores stale boundary responses from earlier search selections', async () => {
     const openRegionInfo = jest.fn();
     const setRegionBoundary = jest.fn();
+    const pushRecentRegion = jest.fn();
 
     mockUseMapStore.mockReturnValue({
       setRegion: jest.fn(),
@@ -56,6 +60,8 @@ describe('RegionSearchBar', () => {
       setRegionInfoError: jest.fn(),
       closeRegionInfo: jest.fn(),
       setRegionBoundary,
+      pushRecentRegion,
+      recentRegions: [],
     });
 
     const searchResults = [
@@ -100,24 +106,16 @@ describe('RegionSearchBar', () => {
     });
     mockFormatClimateOverview.mockReturnValue({ summary: 'Test climate' });
 
-    const firstGeometry = {
-      type: 'Polygon',
-      coordinates: [[
-        [153.0, -27.5],
-        [153.0, -27.4],
-        [153.1, -27.4],
-      ]],
+    const firstBoundaryResult = {
+      regionId: 'region-older',
+      polygons: [{ outline: [{ latitude: -27.5, longitude: 153.0 }] }],
+      properties: { source: 'older' },
     };
-    const secondGeometry = {
-      type: 'Polygon',
-      coordinates: [[
-        [152.9, -27.6],
-        [152.9, -27.5],
-        [153.0, -27.5],
-      ]],
+    const secondBoundaryResult = {
+      regionId: 'region-newer',
+      polygons: [{ outline: [{ latitude: -27.6, longitude: 152.9 }] }],
+      properties: { source: 'newer' },
     };
-    const firstPolygons = [{ outline: [{ latitude: -27.5, longitude: 153.0 }] }];
-    const secondPolygons = [{ outline: [{ latitude: -27.6, longitude: 152.9 }] }];
 
     let resolveFirstBoundary: (value: any) => void;
     let resolveSecondBoundary: (value: any) => void;
@@ -128,18 +126,9 @@ describe('RegionSearchBar', () => {
       resolveSecondBoundary = resolve;
     });
 
-    mockGetRegionBoundary
+    mockLoadRegionBoundary
       .mockImplementationOnce(() => firstBoundaryPromise)
       .mockImplementationOnce(() => secondBoundaryPromise);
-    mockConvertGeometryToShapes.mockImplementation((geometry: any) => {
-      if (geometry === firstGeometry) {
-        return firstPolygons;
-      }
-      if (geometry === secondGeometry) {
-        return secondPolygons;
-      }
-      return [];
-    });
 
     const renderer = create(<RegionSearchBar />);
     const olderResult = renderer.root.find(
@@ -156,32 +145,16 @@ describe('RegionSearchBar', () => {
     });
 
     await act(async () => {
-      resolveSecondBoundary!({
-        success: true,
-        data: {
-          geometry: secondGeometry,
-          properties: { source: 'newer' },
-        },
-      });
+      resolveSecondBoundary!(secondBoundaryResult);
       await Promise.resolve();
     });
 
     await act(async () => {
-      resolveFirstBoundary!({
-        success: true,
-        data: {
-          geometry: firstGeometry,
-          properties: { source: 'older' },
-        },
-      });
+      resolveFirstBoundary!(firstBoundaryResult);
       await Promise.resolve();
     });
 
-    expect(setRegionBoundary).toHaveBeenLastCalledWith({
-      regionId: 'region-newer',
-      polygons: secondPolygons,
-      properties: { source: 'newer' },
-    });
+    expect(setRegionBoundary).toHaveBeenLastCalledWith(secondBoundaryResult);
     expect(openRegionInfo).toHaveBeenCalledWith({
       regionId: 'region-info',
       regionName: 'Region Info',

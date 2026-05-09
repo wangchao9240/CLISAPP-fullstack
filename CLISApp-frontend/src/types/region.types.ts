@@ -15,6 +15,8 @@ export interface RegionClimateStat {
 export interface RegionClimateOverview {
   primary: RegionClimateStat | null;
   secondary: RegionClimateStat[];
+  /** Wind speed in km/h — optional, only present when the API includes it. */
+  wind_speed?: number | null;
 }
 
 export interface RegionInfoPanelState {

@@ -4,13 +4,15 @@
  */
 
 import React, { useCallback, useEffect, useRef } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, Text } from 'react-native';
 import MapView, {
   UrlTile,
   LatLng,
   Region as RNRegion,
   Polygon,
+  Marker,
 } from 'react-native-maps';
+import { PALETTE } from '../../constants/designTokens';
 import { useMapStore } from '../../store/mapStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { Region } from '../../types/map.types';
@@ -50,6 +52,8 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
     activeLayer,
     mapLevel,
     regionBoundary,
+    regionInfo,
+    bottomSheetSnapIndex,
     setRegion,
     setLoading,
     openRegionInfo,
@@ -286,6 +290,30 @@ export const OpenStreetMap: React.FC<OpenStreetMapProps> = ({
               zIndex={BOUNDARY_Z_INDEX.SELECTED_REGION}
             />
           ))}
+        {regionInfo.visible &&
+          bottomSheetSnapIndex === 0 &&
+          regionInfo.latitude !== null &&
+          regionInfo.longitude !== null && (
+            <Marker
+              key={`callout-${regionInfo.regionId}`}
+              coordinate={{
+                latitude: regionInfo.latitude,
+                longitude: regionInfo.longitude,
+              }}
+              tracksViewChanges={false}
+              anchor={{ x: 0.5, y: 1 }}
+              zIndex={10}
+            >
+              <View style={calloutStyles.wrapper}>
+                <View style={calloutStyles.bubble}>
+                  <Text style={calloutStyles.label} numberOfLines={1}>
+                    {regionInfo.regionName} · selected
+                  </Text>
+                </View>
+                <View style={calloutStyles.triangle} />
+              </View>
+            </Marker>
+          )}
       </MapView>
     </View>
   );
@@ -297,5 +325,34 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
+  },
+});
+
+const calloutStyles = StyleSheet.create({
+  wrapper: {
+    alignItems: 'center',
+  },
+  bubble: {
+    backgroundColor: PALETTE.accent,
+    paddingVertical: 6,
+    paddingHorizontal: 11,
+    borderRadius: 8,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: -0.06,
+    color: '#FFFFFF',
+  },
+  // CSS-triangle approximation using zero-size View with borders
+  triangle: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 6,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: PALETTE.accent,
   },
 });

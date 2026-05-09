@@ -1,12 +1,15 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { HEALTH_SHEET_COLORS, RISK_TEXT_COLORS, RiskKey } from '../../constants/healthDesignTokens';
+import { TABULAR_NUMS } from '../../constants/designTokens';
 
 interface MetricTileProps {
   label: string;
   value: string;
   unit: string | null;
   riskLevel: string | undefined;
+  /** Pass TABULAR_NUMS to enable tabular digit alignment on the value. */
+  tabularNums?: typeof TABULAR_NUMS;
 }
 
 const toRiskKey = (risk: string | undefined): RiskKey => {
@@ -19,7 +22,7 @@ const riskDisplayText = (risk: string | undefined): string => {
   return key === 'Unknown' ? '—' : key.toUpperCase();
 };
 
-export const MetricTile: React.FC<MetricTileProps> = ({ label, value, unit, riskLevel }) => {
+export const MetricTile: React.FC<MetricTileProps> = ({ label, value, unit, riskLevel, tabularNums }) => {
   const riskKey = toRiskKey(riskLevel);
   const riskColor = RISK_TEXT_COLORS[riskKey];
   const riskText = riskDisplayText(riskLevel);
@@ -32,7 +35,7 @@ export const MetricTile: React.FC<MetricTileProps> = ({ label, value, unit, risk
     >
       <Text style={styles.label} numberOfLines={1}>{label}</Text>
       <View style={styles.valueRow}>
-        <Text style={styles.value}>{value}</Text>
+        <Text style={styles.value} {...(tabularNums ?? {})}>{value}</Text>
         {unit ? <Text style={styles.unit}>{unit}</Text> : null}
       </View>
       <Text style={[styles.risk, { color: riskColor }]}>{riskText}</Text>

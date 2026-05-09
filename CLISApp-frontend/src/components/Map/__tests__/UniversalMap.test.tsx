@@ -241,7 +241,7 @@ describe('HealthBottomSheet', () => {
     });
 
     const renderer = create(<HealthBottomSheet />);
-    const favoriteButton = renderer.root.find((node) => typeof node.props.onPress === 'function');
+    const favoriteButton = renderer.root.findByProps({ testID: 'favorite-button' });
 
     act(() => {
       favoriteButton.props.onPress();
@@ -296,7 +296,7 @@ describe('HealthBottomSheet', () => {
     });
 
     const renderer = create(<HealthBottomSheet />);
-    const favoriteButton = renderer.root.find((node) => typeof node.props.onPress === 'function');
+    const favoriteButton = renderer.root.findByProps({ testID: 'favorite-button' });
 
     act(() => {
       favoriteButton.props.onPress();
@@ -323,6 +323,7 @@ describe('HealthBottomSheet', () => {
       regionInfo: {
         visible: false,
       },
+      setBottomSheetSnapIndex: jest.fn(),
     }));
 
     mockUseMapStore.mockReturnValue({
@@ -371,6 +372,7 @@ describe('HealthBottomSheet', () => {
       regionInfo: {
         visible: true,
       },
+      setBottomSheetSnapIndex: jest.fn(),
     }));
 
     mockUseMapStore.mockReturnValue({

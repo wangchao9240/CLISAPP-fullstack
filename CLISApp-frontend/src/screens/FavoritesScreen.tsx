@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { Snackbar } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +14,7 @@ import { apiService } from '../services/ApiService';
 import { formatClimateOverview } from '../hooks/useApi';
 import { loadRegionBoundary } from '../services/boundaries/boundaryLoader';
 import type { RegionClimateOverview } from '../types/region.types';
+import { PALETTE, RADII } from '../constants/designTokens';
 
 interface FavoritesScreenProps {
   onNavigateToMap?: () => void;
@@ -33,6 +34,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
     Record<string, RegionClimateOverview>
   >({});
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
+
   const climateMapRef = useRef(climateMap);
   const loadingIdsRef = useRef(loadingIds);
 
@@ -189,6 +191,23 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
     [],
   );
 
+  // Hint card rendered as FlatList footer when there are favorites
+  const ListFooter = useMemo(
+    () =>
+      favorites.length > 0 ? (
+        <View style={styles.hintCard}>
+          <View style={styles.hintIcon}>
+            <Icon name="heart-outline" size={18} color={PALETTE.accent} />
+          </View>
+          <Text style={styles.hintText}>
+            <Text style={styles.hintBold}>Add another suburb</Text>
+            {' — tap the heart on any region in the map to follow it here.'}
+          </Text>
+        </View>
+      ) : null,
+    [favorites.length],
+  );
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
@@ -228,6 +247,7 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
           keyExtractor={keyExtractor}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          ListFooterComponent={ListFooter}
         />
       )}
 
@@ -247,24 +267,62 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9F9FF',
+    backgroundColor: PALETTE.bg,
   },
   header: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    height: 56,
-    justifyContent: 'center',
+    paddingHorizontal: 14,
+    paddingTop: 22,
+    paddingBottom: 14,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 34,
     fontWeight: '700',
-    color: '#181C21',
-    letterSpacing: -0.3,
+    color: PALETTE.fg,
+    letterSpacing: -0.85,
+    lineHeight: 34,
   },
+  // List
   listContent: {
-    paddingVertical: 8,
     paddingBottom: 100,
   },
+  // Hint card
+  hintCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginHorizontal: 14,
+    marginTop: 8,
+    marginBottom: 8,
+    padding: 14,
+    paddingHorizontal: 18,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: PALETTE.border2,
+    borderRadius: RADII.card,
+    backgroundColor: PALETTE.bg,
+  },
+  hintIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: RADII.chip,
+    backgroundColor: PALETTE.surface,
+    borderWidth: 1,
+    borderColor: PALETTE.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  hintText: {
+    flex: 1,
+    fontSize: 13,
+    color: PALETTE.muted,
+    lineHeight: 18,
+  },
+  hintBold: {
+    color: PALETTE.fg2,
+    fontWeight: '600',
+  },
+  // Empty state (unchanged)
   emptyState: {
     flex: 1,
     justifyContent: 'center',

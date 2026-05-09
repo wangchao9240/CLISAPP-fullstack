@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { getActiveClimateStat } from '../../constants/climateData';
@@ -7,14 +7,31 @@ import {
   CATEGORY_BADGE_COLORS,
   DEFAULT_BADGE_COLORS,
 } from '../../constants/healthColors';
+import { PALETTE, RADII, TABULAR_NUMS } from '../../constants/designTokens';
 import type { FavoriteLocation } from '../../store/favoritesStore';
 import type { RegionClimateOverview } from '../../types/region.types';
 import { getClimateDeltaState } from '../../utils/climateDelta';
 
-const VARIANT_ICONS: Record<string, { iconName: string; iconColor: string }> = {
-  warm: { iconName: 'arrow-top-right', iconColor: '#FF7043' },
-  cool: { iconName: 'arrow-bottom-right', iconColor: '#81D4FA' },
-  neutral: { iconName: 'approximately-equal', iconColor: '#78909C' },
+// Maps delta variant to icon name and text/bg colour tokens.
+const VARIANT_ICONS: Record<
+  string,
+  { iconName: string; textColor: string; bgColor: string }
+> = {
+  warm: {
+    iconName: 'arrow-top-right',
+    textColor: PALETTE.warm,
+    bgColor: PALETTE.warmSoft,
+  },
+  cool: {
+    iconName: 'arrow-bottom-right',
+    textColor: PALETTE.cool,
+    bgColor: PALETTE.coolSoft,
+  },
+  neutral: {
+    iconName: 'approximately-equal',
+    textColor: PALETTE.muted,
+    bgColor: PALETTE.surface3,
+  },
 };
 
 interface FavoriteLocationCardProps {
@@ -25,22 +42,20 @@ interface FavoriteLocationCardProps {
   onDelete: () => void;
 }
 
-const formatRelativeTime = (isoTimestamp: string): string => {
-  const saved = new Date(isoTimestamp).getTime();
-  const now = Date.now();
-  const diffMs = now - saved;
+// Format timestamp as "31 Mar 2026".
+const formatDate = (isoTimestamp: string): string =>
+  new Date(isoTimestamp).toLocaleDateString('en-AU', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
 
-  const minutes = Math.floor(diffMs / 60_000);
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes}m ago`;
-
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-
-  return new Date(isoTimestamp).toLocaleDateString();
+// Build the tag line shown under the region name.
+// Falls back gracefully when regionId lacks the expected SSC suffix.
+const buildTagLine = (favorite: FavoriteLocation): string => {
+  const sscMatch = favorite.regionId.match(/ssc[- _]?(\d+)/i);
+  const sscPart = sscMatch ? `SSC ${sscMatch[1]}` : favorite.regionId;
+  return `QLD · ${sscPart}`;
 };
 
 const renderRightActions = (onDelete: () => void, regionName: string) => (
@@ -63,18 +78,25 @@ export const FavoriteLocationCard: React.FC<FavoriteLocationCardProps> = ({
   onDelete,
 }) => {
   const swipeableRef = useRef<Swipeable>(null);
+
   const tempStat = getActiveClimateStat(climate, 'temperature');
   const category = tempStat?.category ?? null;
   const badgeColors = category
     ? CATEGORY_BADGE_COLORS[category] ?? DEFAULT_BADGE_COLORS
     : DEFAULT_BADGE_COLORS;
+
   const deltaState = getClimateDeltaState(favorite.regionId, climate);
-  const variantIcon = VARIANT_ICONS[deltaState.variant] ?? null;
-  const healthLabel = isClimateLoading ? 'Loading...' : category ?? 'No data';
-  const iconName = variantIcon?.iconName ?? null;
-  const iconColor = variantIcon?.iconColor ?? null;
-  const valueText = deltaState.deltaLabel;
-  const hasDelta = iconName != null && iconColor != null && valueText != null;
+  const variantInfo =
+    deltaState.variant !== 'unavailable'
+      ? (VARIANT_ICONS[deltaState.variant] ?? null)
+      : null;
+
+  // Only show delta chip when there is a label (neutral has no label).
+  const hasDelta =
+    variantInfo != null && deltaState.deltaLabel != null;
+
+  const riskLabel = isClimateLoading ? 'Loading...' : (category ?? 'No data');
+  const dotColor = isClimateLoading ? PALETTE.faint : badgeColors.dot;
 
   const handleDelete = () => {
     swipeableRef.current?.close();
@@ -84,7 +106,9 @@ export const FavoriteLocationCard: React.FC<FavoriteLocationCardProps> = ({
   return (
     <Swipeable
       ref={swipeableRef}
-      renderRightActions={() => renderRightActions(handleDelete, favorite.regionName)}
+      renderRightActions={() =>
+        renderRightActions(handleDelete, favorite.regionName)
+      }
       overshootRight={false}
       friction={2}
     >
@@ -94,123 +118,171 @@ export const FavoriteLocationCard: React.FC<FavoriteLocationCardProps> = ({
         accessibilityRole="button"
         accessibilityLabel={`View ${favorite.regionName} on map`}
       >
-        <View style={styles.leftContent}>
-          <Text style={styles.regionName} numberOfLines={1}>
-            {favorite.regionName}
-          </Text>
-          <View style={styles.metaRow}>
-            <View
-              style={[
-                styles.healthDot,
-                {
-                  backgroundColor: isClimateLoading
-                    ? '#BDBDBD'
-                    : badgeColors.dot,
-                },
-              ]}
-            />
-            <Text style={styles.healthLabel}>{healthLabel}</Text>
-            {tempStat ? (
-              <>
-                <View style={styles.separatorDot} />
-                <Text style={styles.metaText}>
-                  {`${tempStat.value} ${tempStat.unit}`}
-                </Text>
-              </>
-            ) : null}
-            <View style={styles.separatorDot} />
-            <Text style={styles.metaText}>
-              {formatRelativeTime(favorite.timestamp)}
+        {/* Top row: name + tag on left, delta chip on right */}
+        <View style={styles.topRow}>
+          <View style={styles.nameBlock}>
+            <Text style={styles.regionName} numberOfLines={1}>
+              {favorite.regionName}
+            </Text>
+            <Text style={styles.tagLine} numberOfLines={1}>
+              {buildTagLine(favorite)}
             </Text>
           </View>
-        </View>
-        <View style={styles.rightContent}>
-          {hasDelta ? (
-            <View style={styles.deltaContainer}>
-              <Icon name={iconName} size={14} color={iconColor} />
-              <Text style={[styles.deltaText, { color: iconColor }]}>
-                {valueText}
+
+          {hasDelta && variantInfo ? (
+            <View
+              style={[
+                styles.deltaChip,
+                { backgroundColor: variantInfo.bgColor },
+              ]}
+            >
+              <Icon
+                name={variantInfo.iconName}
+                size={14}
+                color={variantInfo.textColor}
+              />
+              <Text
+                style={[styles.deltaValue, { color: variantInfo.textColor }]}
+                {...TABULAR_NUMS}
+              >
+                {deltaState.deltaLabel}
               </Text>
             </View>
           ) : null}
-          <Icon name="chevron-right" size={16} color="#BDBDBD" />
+        </View>
+
+        {/* Bottom row: risk dot + level · temp · date + chevron */}
+        <View style={styles.bottomRow}>
+          <View
+            style={[styles.riskDot, { backgroundColor: dotColor }]}
+          />
+          <Text style={styles.riskLevel}>{riskLabel}</Text>
+
+          {tempStat ? (
+            <>
+              <View style={styles.sepDot} />
+              <Text style={styles.tempText} {...TABULAR_NUMS}>
+                {`${tempStat.value} °C`}
+              </Text>
+            </>
+          ) : null}
+
+          <View style={styles.sepDot} />
+          <Text style={styles.dateText} {...TABULAR_NUMS}>
+            {formatDate(favorite.timestamp)}
+          </Text>
+
+          <Icon
+            name="chevron-right"
+            size={14}
+            color={PALETTE.faint}
+            style={styles.chevron}
+          />
         </View>
       </Pressable>
     </Swipeable>
   );
 };
 
+const cardShadow = Platform.select({
+  ios: {
+    shadowColor: '#0D1220',
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 2,
+  },
+  android: {},
+  default: {},
+});
+
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    minHeight: 88,
-    marginHorizontal: 16,
-    marginVertical: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 1,
+    backgroundColor: PALETTE.surface,
+    borderRadius: RADII.card,
     borderWidth: 1,
-    borderColor: 'rgba(193, 198, 212, 0.3)',
+    borderColor: PALETTE.border,
+    padding: 18,
+    marginVertical: 6,
+    marginHorizontal: 14,
+    gap: 14,
+    ...cardShadow,
   },
-  leftContent: {
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  nameBlock: {
     flex: 1,
-    flexDirection: 'column',
-    gap: 8,
   },
   regionName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#181C21',
-    lineHeight: 20,
+    fontSize: 22,
+    fontWeight: '700',
+    color: PALETTE.fg,
+    letterSpacing: -0.44,
+    lineHeight: 24,
   },
-  metaRow: {
+  tagLine: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    letterSpacing: 0.63,
+    textTransform: 'uppercase',
+    color: PALETTE.muted,
+    marginTop: 5,
+  },
+  deltaChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    paddingVertical: 7,
+    paddingHorizontal: 11,
+    borderRadius: 10,
+    flexShrink: 0,
   },
-  healthDot: {
+  deltaValue: {
+    fontSize: 21,
+    fontWeight: '600',
+    letterSpacing: -0.42,
+  },
+  bottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  riskDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#BDBDBD',
+    marginRight: 6,
   },
-  healthLabel: {
+  riskLevel: {
     fontSize: 11,
-    fontWeight: '500',
-    color: '#717783',
+    fontWeight: '600',
+    letterSpacing: 0.66,
+    textTransform: 'uppercase',
+    color: PALETTE.muted,
   },
-  separatorDot: {
+  sepDot: {
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#717783',
+    backgroundColor: PALETTE.faint,
+    marginHorizontal: 6,
   },
-  metaText: {
-    fontSize: 14,
-    color: '#414752',
-  },
-  rightContent: {
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    paddingLeft: 8,
-  },
-  deltaContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    marginBottom: 4,
-  },
-  deltaText: {
-    fontSize: 14,
+  tempText: {
+    fontSize: 13,
     fontWeight: '500',
+    letterSpacing: -0.065,
+    color: PALETTE.fg2,
+  },
+  dateText: {
+    fontSize: 11.5,
+    letterSpacing: 0.23,
+    color: PALETTE.faint,
+    fontFamily: 'Menlo',
+  },
+  chevron: {
+    marginLeft: 'auto',
   },
   deleteAction: {
     backgroundColor: '#E57373',
@@ -219,9 +291,9 @@ const styles = StyleSheet.create({
     width: 80,
     flexDirection: 'column',
     gap: 4,
-    borderTopRightRadius: 12,
-    borderBottomRightRadius: 12,
-    marginVertical: 4,
+    borderTopRightRadius: RADII.card,
+    borderBottomRightRadius: RADII.card,
+    marginVertical: 6,
   },
   deleteText: {
     fontSize: 14,

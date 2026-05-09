@@ -51,6 +51,7 @@ jest.mock('react-native-maps', () => {
     default: MockMapView,
     UrlTile: (props: any) => mockUrlTile(props),
     Polygon: (props: any) => mockPolygon(props),
+    Marker: (props: any) => <>{props.children}</>,
   };
 });
 
@@ -85,6 +86,18 @@ describe('OpenStreetMap', () => {
     longitudeDelta: 0.2,
   };
 
+  const baseRegionInfo = {
+    visible: false,
+    regionId: null,
+    regionName: null,
+    regionType: null,
+    latitude: null,
+    longitude: null,
+    climate: null,
+    loading: false,
+    error: null,
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockMapViewProps = undefined;
@@ -94,6 +107,7 @@ describe('OpenStreetMap', () => {
     mockUseBoundaryOverlays.mockReturnValue([]);
     (mockUseMapStore as any).getState = jest.fn(() => ({
       activeLayer: 'temperature',
+      regionInfo: baseRegionInfo,
     }));
   });
 
@@ -124,6 +138,8 @@ describe('OpenStreetMap', () => {
         regionId: 'region-1',
         polygons: [selectedPolygon],
       },
+      regionInfo: baseRegionInfo,
+      bottomSheetSnapIndex: -1,
       setRegion,
       setLoading,
       openRegionInfo: jest.fn(),
@@ -156,6 +172,8 @@ describe('OpenStreetMap', () => {
       activeLayer: 'temperature',
       mapLevel: 'coarse',
       regionBoundary: null,
+      regionInfo: baseRegionInfo,
+      bottomSheetSnapIndex: -1,
       setRegion,
       setLoading,
       openRegionInfo: jest.fn(),
@@ -166,6 +184,7 @@ describe('OpenStreetMap', () => {
     });
     (mockUseMapStore as any).getState = jest.fn(() => ({
       region: baseRegion,
+      regionInfo: baseRegionInfo,
     }));
 
     create(<OpenStreetMap />);
@@ -210,6 +229,8 @@ describe('OpenStreetMap', () => {
       activeLayer: 'temperature',
       mapLevel: 'coarse',
       regionBoundary: null,
+      regionInfo: baseRegionInfo,
+      bottomSheetSnapIndex: -1,
       setRegion: jest.fn(),
       setLoading: jest.fn(),
       openRegionInfo,
@@ -278,6 +299,8 @@ describe('OpenStreetMap', () => {
       activeLayer: 'temperature',
       mapLevel: 'coarse',
       regionBoundary: null,
+      regionInfo: baseRegionInfo,
+      bottomSheetSnapIndex: -1,
       setRegion: jest.fn(),
       setLoading: jest.fn(),
       openRegionInfo: jest.fn(),

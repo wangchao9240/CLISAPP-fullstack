@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, View, StatusBar, TouchableOpacity, Image, Alert, Platform, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { PALETTE, RADII } from '../constants/designTokens';
 import { UniversalMap } from '../components/Map/UniversalMap';
 import Geolocation from 'react-native-geolocation-service';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
@@ -229,7 +230,7 @@ const styles = StyleSheet.create({
   },
   rightControls: {
     position: 'absolute',
-    right: 16,
+    right: 14,
     bottom: 80,
     alignItems: 'center',
     gap: 12,
@@ -237,34 +238,42 @@ const styles = StyleSheet.create({
   },
   bottomLeftControls: {
     position: 'absolute',
-    left: 16,
+    left: 14,
     bottom: 80,
     pointerEvents: 'box-none',
   },
   controlButton: {
-    width: 40,
-    height: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    backgroundColor: PALETTE.surface,
+    borderRadius: RADII.control,
+    borderWidth: 1,
+    borderColor: PALETTE.border,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#0D1220',
+        shadowOpacity: 0.10,
+        shadowOffset: { width: 0, height: 8 },
+        shadowRadius: 24,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
     pointerEvents: 'auto',
   },
   controlButtonActive: {
-    backgroundColor: 'rgba(0, 122, 255, 0.1)',
+    backgroundColor: PALETTE.accentSoft,
   },
   controlIcon: {
     width: 20,
     height: 20,
-    tintColor: '#333',
+    tintColor: PALETTE.fg2,
   },
   controlIconActive: {
-    tintColor: '#007AFF',
+    tintColor: PALETTE.accent,
     opacity: 0.7,
   },
   legendContainer: {
@@ -275,15 +284,21 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 52,
     left: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 16,
+    backgroundColor: PALETTE.surface,
+    borderRadius: RADII.control,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.05)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    borderColor: PALETTE.border,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#0D1220',
+        shadowOpacity: 0.10,
+        shadowOffset: { width: 0, height: 8 },
+        shadowRadius: 24,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
     minWidth: 200,
     pointerEvents: 'auto',
   },
@@ -297,14 +312,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 12,
     height: 2,
-    backgroundColor: '#333',
+    backgroundColor: PALETTE.fg2,
     borderRadius: 1,
   },
   plusVertical: {
     position: 'absolute',
     width: 2,
     height: 12,
-    backgroundColor: '#333',
+    backgroundColor: PALETTE.fg2,
     borderRadius: 1,
   },
 });

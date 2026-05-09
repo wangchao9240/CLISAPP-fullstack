@@ -190,11 +190,11 @@ describe('FavoriteLocationCard', () => {
     expect(deleteButton.length).toBeGreaterThan(0);
   });
 
-  it('renders relative timestamp', () => {
-    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60_000).toISOString();
+  it('renders formatted date timestamp', () => {
+    const knownDate = new Date('2026-03-31T10:00:00.000Z').toISOString();
     const tree = create(
       <FavoriteLocationCard
-        favorite={makeFavorite({ timestamp: twoHoursAgo })}
+        favorite={makeFavorite({ timestamp: knownDate })}
         climate={null}
         isClimateLoading={false}
         onPress={onPress}
@@ -202,13 +202,15 @@ describe('FavoriteLocationCard', () => {
       />,
     );
     const texts = tree.root.findAllByType('Text' as any);
-    const timeText = texts.find((t: any) => {
+    // Date is rendered as "31 Mar 2026" (en-AU locale via toLocaleDateString).
+    // The exact string may vary slightly by environment; check for the year.
+    const dateText = texts.find((t: any) => {
       try {
-        return typeof t.props.children === 'string' && t.props.children.includes('2h ago');
+        return typeof t.props.children === 'string' && t.props.children.includes('2026');
       } catch {
         return false;
       }
     });
-    expect(timeText).toBeDefined();
+    expect(dateText).toBeDefined();
   });
 });
