@@ -1,0 +1,54 @@
+{
+  "primary": {
+    "layer": "pm25",
+    "name": "PM2.5",
+    "value": 8,
+    "unit": "ug/m3",
+    "category": "Low",
+    "riskLevel": "Good",
+    "advice": "Air quality is good. Outdoor activity is fine for everyone.",
+    "lastUpdated": "2026-05-15T08:00:00Z"
+  },
+  "secondary": [
+    {
+      "layer": "uv",
+      "name": "UV Index",
+      "value": 2,
+      "unit": "UVI",
+      "category": "Low",
+      "riskLevel": "Good",
+      "advice": "Low UV. No special precautions needed.",
+      "lastUpdated": "2026-05-15T08:00:00Z"
+    },
+    {
+      "layer": "temperature",
+      "name": "Temperature",
+      "value": 21,
+      "unit": "C",
+      "category": "Low",
+      "riskLevel": "Good",
+      "advice": "Comfortable temperature.",
+      "lastUpdated": "2026-05-15T08:00:00Z"
+    },
+    {
+      "layer": "humidity",
+      "name": "Humidity",
+      "value": 55,
+      "unit": "%",
+      "category": "Low",
+      "riskLevel": "Good",
+      "advice": "Comfortable humidity.",
+      "lastUpdated": "2026-05-15T08:00:00Z"
+    },
+    {
+      "layer": "precipitation",
+      "name": "Precipitation",
+      "value": 0,
+      "unit": "mm",
+      "category": "Low",
+      "riskLevel": "Good",
+      "advice": "Dry conditions.",
+      "lastUpdated": "2026-05-15T08:00:00Z"
+    }
+  ]
+}

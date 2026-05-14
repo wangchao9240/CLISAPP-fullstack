@@ -1,0 +1,54 @@
+{
+  "primary": {
+    "layer": "pm25",
+    "name": "PM2.5",
+    "value": 95,
+    "unit": "ug/m3",
+    "category": "High",
+    "riskLevel": "Unhealthy",
+    "advice": "PM2.5 above guideline. Sensitive groups should stay indoors.",
+    "lastUpdated": "2026-05-15T08:00:00Z"
+  },
+  "secondary": [
+    {
+      "layer": "uv",
+      "name": "UV Index",
+      "value": 5,
+      "unit": "UVI",
+      "category": "Moderate",
+      "riskLevel": "Moderate",
+      "advice": "Use sunscreen.",
+      "lastUpdated": "2026-05-15T08:00:00Z"
+    },
+    {
+      "layer": "temperature",
+      "name": "Temperature",
+      "value": 32,
+      "unit": "C",
+      "category": "Moderate",
+      "riskLevel": "Moderate",
+      "advice": "Warm. Stay hydrated.",
+      "lastUpdated": "2026-05-15T08:00:00Z"
+    },
+    {
+      "layer": "humidity",
+      "name": "Humidity",
+      "value": 70,
+      "unit": "%",
+      "category": "Moderate",
+      "riskLevel": "Moderate",
+      "advice": "Humid.",
+      "lastUpdated": "2026-05-15T08:00:00Z"
+    },
+    {
+      "layer": "precipitation",
+      "name": "Precipitation",
+      "value": 0,
+      "unit": "mm",
+      "category": "Low",
+      "riskLevel": "Good",
+      "advice": "Dry conditions.",
+      "lastUpdated": "2026-05-15T08:00:00Z"
+    }
+  ]
+}

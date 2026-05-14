@@ -21,6 +21,8 @@ import {
 } from './src/services/notificationService';
 import { sendTelemetry } from './src/services/telemetryService';
 
+const DebugFAB = __DEV__ ? require('./src/debug').DebugFAB : null;
+
 function App(): React.JSX.Element {
   useEffect(() => {
     if (Platform.OS !== 'android') {
@@ -46,6 +48,7 @@ function App(): React.JSX.Element {
           <BottomSheetModalProvider>
             <AppNavigator />
             <HealthBottomSheet />
+            {DebugFAB ? <DebugFAB /> : null}
           </BottomSheetModalProvider>
         </PaperProvider>
       </SafeAreaProvider>

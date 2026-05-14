@@ -17,13 +17,21 @@ interface TelemetryLocation {
   lon: number;
 }
 
-interface TelemetryPayload {
+export interface TelemetryPayload {
   device_id: string;
   event_date: string;
   time_of_day: string;
   lat: number | null;
   lon: number | null;
 }
+
+type DebugTap = (payload: TelemetryPayload, outcome: 'ok' | 'fail') => void;
+
+let debugTap: DebugTap | undefined;
+
+export const __setDebugTap = (fn: DebugTap | undefined): void => {
+  debugTap = fn;
+};
 
 const padTimeUnit = (value: number): string =>
   value.toString().padStart(2, '0');
@@ -138,13 +146,15 @@ export const getLocationForTelemetry =
   };
 
 export const sendTelemetry = async (): Promise<void> => {
+  let payload: TelemetryPayload | null = null;
+
   try {
     const [deviceId, location] = await Promise.all([
       getDeviceId(),
       getLocationForTelemetry(),
     ]);
     const now = new Date();
-    const payload: TelemetryPayload = {
+    payload = {
       device_id: deviceId,
       event_date: buildEventDate(now),
       time_of_day: buildTimeOfDay(now),
@@ -152,14 +162,23 @@ export const sendTelemetry = async (): Promise<void> => {
       lon: location?.lon ?? null,
     };
 
-    await fetch(`${API_CONFIG.BASE_URL}/api/v1/telemetry`, {
+    const response = await fetch(`${API_CONFIG.BASE_URL}/api/v1/telemetry`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
     });
+
+    if (!response.ok) {
+      throw new Error(`Telemetry POST failed with ${response.status}`);
+    }
+
+    debugTap?.(payload, 'ok');
   } catch {
+    if (payload) {
+      debugTap?.(payload, 'fail');
+    }
     // Telemetry is fire-and-forget and must never affect app startup.
   }
 };

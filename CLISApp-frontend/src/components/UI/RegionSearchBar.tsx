@@ -371,7 +371,7 @@ const SuggestionItem: React.FC<{
 }> = ({ item, query, onPress }) => {
   const [before, match, after] = splitHighlight(item.name, query);
   return (
-    <TouchableOpacity style={styles.resultItem} onPress={() => onPress(item)} item={item}>
+    <TouchableOpacity style={styles.resultItem} onPress={() => onPress(item)}>
       <View style={styles.pinTile}>
         <Icon name="map-marker" size={16} color={PALETTE.accent} />
       </View>

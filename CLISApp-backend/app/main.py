@@ -84,6 +84,11 @@ def create_application() -> FastAPI:
     app.include_router(tiles.router, prefix="/api/v1", tags=["tiles"])
     app.include_router(regions.router, prefix="/api/v1", tags=["regions"])
     app.include_router(telemetry.router, prefix="/api/v1", tags=["telemetry"])
+    if settings.debug:
+        from app.api.v1 import debug as debug_router
+
+        app.include_router(debug_router.router, prefix="/api/v1/debug", tags=["debug"])
+        logger.info("Debug endpoints mounted at /api/v1/debug")
 
     # Legacy health endpoint for backward compatibility (Phase 1)
     # This provides compatibility with Phase 0 frontend that uses /health

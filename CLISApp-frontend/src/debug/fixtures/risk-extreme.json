@@ -1,0 +1,54 @@
+{
+  "primary": {
+    "layer": "pm25",
+    "name": "PM2.5",
+    "value": 250,
+    "unit": "ug/m3",
+    "category": "Extreme",
+    "riskLevel": "Hazardous",
+    "advice": "Hazardous air quality. Avoid all outdoor activity.",
+    "lastUpdated": "2026-05-15T08:00:00Z"
+  },
+  "secondary": [
+    {
+      "layer": "uv",
+      "name": "UV Index",
+      "value": 8,
+      "unit": "UVI",
+      "category": "High",
+      "riskLevel": "Unhealthy",
+      "advice": "Very high UV. Stay in shade during peak daylight hours.",
+      "lastUpdated": "2026-05-15T08:00:00Z"
+    },
+    {
+      "layer": "temperature",
+      "name": "Temperature",
+      "value": 38,
+      "unit": "C",
+      "category": "High",
+      "riskLevel": "Unhealthy",
+      "advice": "Extreme heat warning.",
+      "lastUpdated": "2026-05-15T08:00:00Z"
+    },
+    {
+      "layer": "humidity",
+      "name": "Humidity",
+      "value": 20,
+      "unit": "%",
+      "category": "Moderate",
+      "riskLevel": "Moderate",
+      "advice": "Very dry.",
+      "lastUpdated": "2026-05-15T08:00:00Z"
+    },
+    {
+      "layer": "precipitation",
+      "name": "Precipitation",
+      "value": 0,
+      "unit": "mm",
+      "category": "Low",
+      "riskLevel": "Good",
+      "advice": "Dry conditions.",
+      "lastUpdated": "2026-05-15T08:00:00Z"
+    }
+  ]
+}

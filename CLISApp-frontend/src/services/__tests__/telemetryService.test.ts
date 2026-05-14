@@ -4,6 +4,7 @@ import Geolocation from 'react-native-geolocation-service';
 import { check, RESULTS } from 'react-native-permissions';
 import { API_CONFIG } from '../../constants/apiEndpoints';
 import {
+  __setDebugTap,
   getDeviceId,
   getLocationForTelemetry,
   sendTelemetry,
@@ -68,6 +69,7 @@ describe('telemetryService', () => {
   });
 
   beforeEach(() => {
+    __setDebugTap(undefined);
     jest.useFakeTimers();
     jest.setSystemTime(new Date(2026, 2, 29, 9, 30, 45));
 
@@ -93,6 +95,7 @@ describe('telemetryService', () => {
   });
 
   afterEach(() => {
+    __setDebugTap(undefined);
     jest.useRealTimers();
   });
 
@@ -192,5 +195,56 @@ describe('telemetryService', () => {
     expect(payload.time_of_day).toBe('07:08:09');
     expect(payload.event_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(payload.time_of_day).toMatch(/^\d{2}:\d{2}:\d{2}$/);
+  });
+
+  it('invokes the debug tap with payload and ok outcome on successful POST', async () => {
+    const tap = jest.fn();
+    __setDebugTap(tap);
+
+    await sendTelemetry();
+
+    expect(tap).toHaveBeenCalledTimes(1);
+    expect(tap.mock.calls[0][1]).toBe('ok');
+    expect(tap.mock.calls[0][0]).toMatchObject({
+      device_id: 'device-123',
+      event_date: '2026-03-29',
+      time_of_day: '09:30:45',
+      lat: -27.47,
+      lon: 153.03,
+    });
+  });
+
+  it('invokes the debug tap with fail outcome when fetch throws after payload creation', async () => {
+    const tap = jest.fn();
+    __setDebugTap(tap);
+    mockFetch.mockRejectedValue(new Error('network'));
+
+    await sendTelemetry();
+
+    expect(tap).toHaveBeenCalledWith(
+      expect.objectContaining({ device_id: 'device-123' }),
+      'fail',
+    );
+  });
+
+  it('invokes the debug tap with fail outcome when telemetry POST is not successful', async () => {
+    const tap = jest.fn();
+    __setDebugTap(tap);
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: async () => ({}),
+    });
+
+    await sendTelemetry();
+
+    expect(tap).toHaveBeenCalledWith(
+      expect.objectContaining({ device_id: 'device-123' }),
+      'fail',
+    );
+  });
+
+  it('is a no-op when debug tap is undefined', async () => {
+    await expect(sendTelemetry()).resolves.toBeUndefined();
   });
 });

@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     # Application Info
     app_name: str = Field(default="CLISApp Backend", env="APP_NAME")
     app_version: str = Field(default="1.0.0", env="APP_VERSION")
-    debug: bool = Field(default=True, env="DEBUG")
+    debug: bool = Field(default=False, env="DEBUG")
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
 
     # Server Configuration

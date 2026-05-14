@@ -10,6 +10,8 @@ services:
         value: "1"
       - key: LOG_LEVEL
         value: INFO
+      - key: DEBUG
+        value: "false"
 
   - type: web
     name: clisapp-tiles
