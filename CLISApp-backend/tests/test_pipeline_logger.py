@@ -24,6 +24,11 @@ class FakeArray:
     def astype(self, _dtype):
         return self
 
+    def __array__(self, dtype=None):
+        import numpy as np
+
+        return np.array(self.values, dtype=dtype)
+
 
 class FakeMask:
     def __init__(self, values):

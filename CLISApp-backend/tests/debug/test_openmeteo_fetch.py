@@ -50,7 +50,7 @@ def parse_args():
     return parser.parse_args()
 
 
-async def test_fetch(num_points: int):
+async def run_fetch_test(num_points: int):
     """
     Test fetching data from Open-Meteo.
 
@@ -165,7 +165,7 @@ async def main():
         logging.getLogger().setLevel(logging.DEBUG)
 
     try:
-        await test_fetch(args.num_points)
+        await run_fetch_test(args.num_points)
         sys.exit(0)
     except Exception as e:
         logger.error(f"Test failed: {e}", exc_info=args.verbose)
