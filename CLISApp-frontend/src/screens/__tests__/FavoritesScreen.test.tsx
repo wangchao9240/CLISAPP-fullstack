@@ -339,6 +339,32 @@ describe('FavoritesScreen', () => {
     expect(mockSetRegion).toHaveBeenCalled();
     expect(mockSetSelectedRegion).toHaveBeenCalledWith('ssc-123');
     expect(onNavigateToMap).toHaveBeenCalled();
+    expect(mockOpenRegionInfo).toHaveBeenCalledWith(
+      expect.objectContaining({ regionId: 'ssc-123' }),
+    );
+  });
+
+  it('navigates to map before opening the region info popup', async () => {
+    const fav = makeFavorite();
+    mockFavorites = [fav];
+    const tree = await renderScreen();
+    const cardButton = tree.root.findAllByProps({
+      accessibilityLabel: 'View Sunnybank Hills on map',
+    });
+
+    const callOrder: string[] = [];
+    onNavigateToMap.mockImplementation(() => {
+      callOrder.push('navigate');
+    });
+    mockOpenRegionInfo.mockImplementation(() => {
+      callOrder.push('openRegionInfo');
+    });
+
+    await act(async () => {
+      await cardButton[0].props.onPress();
+    });
+
+    expect(callOrder).toEqual(['navigate', 'openRegionInfo']);
   });
 
   it('does not navigate when favorite has no coordinates', async () => {

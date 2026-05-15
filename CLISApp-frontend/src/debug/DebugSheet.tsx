@@ -15,7 +15,6 @@ import { API_CONFIG } from '../constants/apiEndpoints';
 import { useMapStore } from '../store/mapStore';
 import { useDebugStore, type RiskKey } from './debugStore';
 import { TelemetryTailScreen } from './TelemetryTailScreen';
-import { setBoundaryMode } from './scenarios/boundaries';
 import {
   applyComingSoonPlaceholder,
   clearCurrentRegion,
@@ -152,26 +151,6 @@ export const DebugSheet = forwardRef<DebugSheetHandle>((_props, ref) => {
               onPress={() => runScenario(() => firePushReal(API_CONFIG.BASE_URL))}
               testID="debug-push-real"
             />
-
-            <Text style={styles.groupHeader}>BOUNDARIES</Text>
-            <View style={styles.row}>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => runScenario(() => setBoundaryMode('ssc'))}
-                style={styles.chip}
-                testID="debug-boundary-ssc"
-              >
-                <Text style={styles.chipText}>SSC</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => runScenario(() => setBoundaryMode('lga'))}
-                style={styles.chip}
-                testID="debug-boundary-lga"
-              >
-                <Text style={styles.chipText}>LGA</Text>
-              </Pressable>
-            </View>
 
             <Text style={styles.groupHeader}>TELEMETRY</Text>
             <DebugButton

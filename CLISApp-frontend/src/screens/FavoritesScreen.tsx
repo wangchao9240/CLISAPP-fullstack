@@ -116,6 +116,8 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
         return;
       }
 
+      onNavigateToMap?.();
+
       const {
         setRegion,
         setSelectedRegion,
@@ -167,8 +169,6 @@ export const FavoritesScreen: React.FC<FavoritesScreenProps> = ({
         .catch(() => {
           // Boundary load failure is non-critical
         });
-
-      onNavigateToMap?.();
     },
     [onNavigateToMap],
   );

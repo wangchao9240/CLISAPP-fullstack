@@ -7,7 +7,6 @@ import { API_CONFIG } from '../../constants/apiEndpoints';
 import * as riskCycle from '../scenarios/riskCycle';
 import * as pushSim from '../scenarios/pushSim';
 import * as pushReal from '../scenarios/pushReal';
-import * as boundaries from '../scenarios/boundaries';
 
 const mockPresent = jest.fn();
 const mockDismiss = jest.fn();
@@ -73,7 +72,6 @@ describe('DebugSheet', () => {
     expect(findText(renderer, 'RISK BADGES').length).toBe(1);
     expect(findText(renderer, 'EMPTY / FALLBACK').length).toBe(1);
     expect(findText(renderer, 'PUSH NOTIFICATION').length).toBe(1);
-    expect(findText(renderer, 'BOUNDARIES').length).toBe(1);
     expect(findText(renderer, 'TELEMETRY').length).toBe(1);
     expect(findText(renderer, 'Reset all overrides').length).toBe(1);
     renderer.unmount();
@@ -170,20 +168,6 @@ describe('DebugSheet', () => {
 
     expect(useMapStore.getState().regionInfo.visible).toBe(false);
     expect(mockDismiss).toHaveBeenCalledTimes(1);
-    renderer.unmount();
-  });
-
-  it('SSC/LGA buttons call setBoundaryMode', () => {
-    const spy = jest.spyOn(boundaries, 'setBoundaryMode').mockImplementation(() => {});
-    const renderer = create(<DebugSheet />);
-
-    act(() => {
-      renderer.root.findByProps({ testID: 'debug-boundary-ssc' }).props.onPress();
-      renderer.root.findByProps({ testID: 'debug-boundary-lga' }).props.onPress();
-    });
-
-    expect(spy).toHaveBeenCalledWith('ssc');
-    expect(spy).toHaveBeenLastCalledWith('lga');
     renderer.unmount();
   });
 

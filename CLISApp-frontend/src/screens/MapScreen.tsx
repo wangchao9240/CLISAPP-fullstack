@@ -1,5 +1,5 @@
 // Main map screen implementing FR-001 and FR-002
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { StyleSheet, View, StatusBar, TouchableOpacity, Image, Alert, Platform, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PALETTE, RADII } from '../constants/designTokens';
@@ -21,12 +21,16 @@ export const MapScreen: React.FC<MapScreenProps> = ({ isActive = true }) => {
   const [locating, setLocating] = useState(false);
   const { setRegion, regionInfo, closeRegionInfo, clearRegionInfo } = useMapStore();
 
-  // Close sheet when tab becomes inactive (fixes sheet leak to other tabs)
+  // Close sheet only on the active → inactive transition so that opening the
+  // region info from another tab (e.g. Favorites) before navigating here is
+  // not wiped by this cleanup.
+  const prevIsActiveRef = useRef(isActive);
   useEffect(() => {
-    if (!isActive && regionInfo.visible) {
+    if (prevIsActiveRef.current && !isActive && regionInfo.visible) {
       closeRegionInfo();
       clearRegionInfo();
     }
+    prevIsActiveRef.current = isActive;
   }, [isActive, regionInfo.visible, closeRegionInfo, clearRegionInfo]);
 
   // Android back button handling (AC #5, #6)
