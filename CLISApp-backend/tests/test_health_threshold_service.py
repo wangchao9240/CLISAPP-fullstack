@@ -356,3 +356,32 @@ def test_notification_service_evaluate_layers_uses_unhealthy_name(tmp_path: Path
 
     assert len(breaches) == 1
     assert breaches[0]["risk_level"] == "Unhealthy"
+
+
+def test_notification_service_skips_good_and_moderate(tmp_path: Path) -> None:
+    real_config_path = Path(__file__).resolve().parents[1] / "data" / "health_thresholds.json"
+    service = NotificationService(
+        credentials_path=tmp_path / "missing-service-account.json",
+        thresholds_path=real_config_path,
+    )
+
+    # pm25=5 → Good, pm25=20 → Moderate. Both must be filtered out by the
+    # ≥ Unhealthy notification gate.
+    breaches = service.evaluate_layers({"pm25": 5.0})
+    assert breaches == []
+
+    breaches = service.evaluate_layers({"pm25": 20.0})
+    assert breaches == []
+
+
+def test_notification_service_triggers_for_unhealthy_and_hazardous(tmp_path: Path) -> None:
+    real_config_path = Path(__file__).resolve().parents[1] / "data" / "health_thresholds.json"
+    service = NotificationService(
+        credentials_path=tmp_path / "missing-service-account.json",
+        thresholds_path=real_config_path,
+    )
+
+    # pm25=40 → Unhealthy, pm25=100 → Hazardous. Both must breach the gate.
+    breaches = service.evaluate_layers({"pm25": 40.0, "uv": 9.0})
+    risk_levels = {b["risk_level"] for b in breaches}
+    assert risk_levels == {"Unhealthy", "Hazardous"}

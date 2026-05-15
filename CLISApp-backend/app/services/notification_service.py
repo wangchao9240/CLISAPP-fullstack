@@ -25,6 +25,7 @@ SEVERITY_ORDER = {
     "Unhealthy": 2,
     "Hazardous": 3,
 }
+MIN_NOTIFY_SEVERITY = "Unhealthy"
 
 
 class NotificationService:
@@ -120,7 +121,9 @@ class NotificationService:
             risk_level = self._determine_risk_level(
                 value, layer_config.get("thresholds", {})
             )
-            if risk_level is None or risk_level == "Good":
+            if risk_level is None:
+                continue
+            if SEVERITY_ORDER.get(risk_level, -1) < SEVERITY_ORDER[MIN_NOTIFY_SEVERITY]:
                 continue
 
             breaches.append(
