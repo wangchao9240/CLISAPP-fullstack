@@ -459,7 +459,10 @@ class PM25TileGenerator:
             window = Window(col_off, row_off, width, height)
 
         try:
-            data = src.read(1, window=window)
+            # boundless=True so out-of-source pixels return NaN at the requested
+            # window dimensions; otherwise rasterio silently clips and the
+            # downstream src_transform misplaces the data geographically.
+            data = src.read(1, window=window, boundless=True, fill_value=np.nan)
         except Exception:
             return None
 
@@ -582,7 +585,10 @@ class PM25TileGenerator:
             window = Window(col_off, row_off, width, height)
 
         try:
-            data = src.read(1, window=window)
+            # boundless=True so out-of-source pixels return NaN at the requested
+            # window dimensions; otherwise rasterio silently clips and the
+            # downstream src_transform misplaces the data geographically.
+            data = src.read(1, window=window, boundless=True, fill_value=np.nan)
         except Exception:
             return 0
 
