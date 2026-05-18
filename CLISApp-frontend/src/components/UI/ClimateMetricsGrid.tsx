@@ -22,7 +22,7 @@ const TILES: TileSpec[] = [
   { layer: 'temperature', label: 'TEMP', decimals: 1 },
   { layer: 'uv', label: 'UV INDEX', decimals: 0 },
   { layer: 'humidity', label: 'HUMIDITY', decimals: 0 },
-  { layer: 'precipitation', label: 'PRECIP', unitOverride: 'mm/h', decimals: 1 },
+  { layer: 'precipitation', label: 'PRECIP', unitOverride: 'mm/day', decimals: 1 },
 ];
 
 const pickStat = (

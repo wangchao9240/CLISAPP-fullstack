@@ -53,11 +53,11 @@ LAYER_CONFIG = {
         "openmeteo_param": "relative_humidity_2m",
     },
     "precipitation": {
-        "unit": "mm",
+        "unit": "mm/day",
         "min_value": 0,
-        "max_value": 100,
+        "max_value": 200,
         "precision": 1,
-        "color_breaks": [0, 0.5, 2, 10, 50],
+        "color_breaks": [0, 2, 10, 50, 100],
         "data_source": "Open-Meteo",
         "openmeteo_param": "precipitation"
     },

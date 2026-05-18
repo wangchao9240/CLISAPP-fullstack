@@ -113,6 +113,7 @@ class OpenMeteoFetcher:
             "latitude": lat_str,
             "longitude": lon_str,
             "current": "temperature_2m,relative_humidity_2m,precipitation,uv_index",
+            "daily": "precipitation_sum",
             "timezone": self.TIMEZONE,
             "forecast_days": 1  # Only get today's data
         }
@@ -173,6 +174,22 @@ class OpenMeteoFetcher:
 
         return response.json()
 
+    @staticmethod
+    def _resolve_precipitation(weather_payload: Dict[str, Any]) -> float:
+        """Prefer daily.precipitation_sum (mm/day); fall back to current.precipitation if missing."""
+        daily_block = weather_payload.get("daily", {}) or {}
+        daily_values = daily_block.get("precipitation_sum")
+        if isinstance(daily_values, list) and daily_values:
+            first_value = daily_values[0]
+            if first_value is not None:
+                return float(first_value)
+
+        current_value = weather_payload.get("current", {}).get("precipitation")
+        if current_value is not None:
+            return float(current_value)
+
+        return 0.0
+
     async def _process_batch(
         self,
         batch: List[Dict[str, float]],
@@ -217,7 +234,7 @@ class OpenMeteoFetcher:
                         "longitude": point["longitude"],
                         "temperature": location_weather.get("current", {}).get("temperature_2m"),
                         "humidity": location_weather.get("current", {}).get("relative_humidity_2m"),
-                        "precipitation": location_weather.get("current", {}).get("precipitation", 0.0),
+                        "precipitation": self._resolve_precipitation(location_weather),
                         "uv_index": location_weather.get("current", {}).get("uv_index", 0.0),
                         "pm25": location_air_quality.get("current", {}).get("pm2_5"),
                         "timestamp": timestamp,
@@ -231,7 +248,7 @@ class OpenMeteoFetcher:
                     "longitude": point["longitude"],
                     "temperature": weather_data.get("current", {}).get("temperature_2m"),
                     "humidity": weather_data.get("current", {}).get("relative_humidity_2m"),
-                    "precipitation": weather_data.get("current", {}).get("precipitation", 0.0),
+                    "precipitation": self._resolve_precipitation(weather_data),
                     "uv_index": weather_data.get("current", {}).get("uv_index", 0.0),
                     "pm25": air_quality_data.get("current", {}).get("pm2_5"),
                     "timestamp": timestamp,

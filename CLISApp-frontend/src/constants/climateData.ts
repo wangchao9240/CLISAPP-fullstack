@@ -7,7 +7,7 @@ const PM25_DEFAULT_THRESHOLDS = [0, 12, 35, 55, 150];
 let pm25Thresholds = [...PM25_DEFAULT_THRESHOLDS];
 
 const PRECIP_COLOR_SCALE = ['#ffffff', '#87ceeb', '#4169e1', '#0000ff', '#00008b'];
-const PRECIP_DEFAULT_THRESHOLDS = [0, 0.5, 2, 10, 50];
+const PRECIP_DEFAULT_THRESHOLDS = [0, 2, 10, 50, 100];
 let precipitationThresholds = [...PRECIP_DEFAULT_THRESHOLDS];
 
 export const CLIMATE_LAYER_ORDER: ClimateLayer[] = ['pm25', 'precipitation', 'uv', 'humidity', 'temperature'];
@@ -23,9 +23,9 @@ export const CLIMATE_LAYERS: Record<ClimateLayer, ClimateDataConfig> = {
   precipitation: {
     name: 'Precipitation',
     colorScale: PRECIP_COLOR_SCALE,
-    unit: 'mm/hour',
+    unit: 'mm/day',
     thresholds: precipitationThresholds,
-    description: 'Hourly precipitation rate',
+    description: 'Daily precipitation total',
   },
   uv: {
     name: 'UV Index',

@@ -114,22 +114,22 @@
     },
     "precipitation": {
       "name": "Precipitation",
-      "unit": "mm/hour",
+      "unit": "mm/day",
       "thresholds": {
         "Good": [
           0,
-          0.5
+          2
         ],
         "Moderate": [
-          0.5,
-          2.5
-        ],
-        "Unhealthy": [
-          2.5,
+          2,
           10
         ],
-        "Hazardous": [
+        "Unhealthy": [
           10,
+          50
+        ],
+        "Hazardous": [
+          50,
           null
         ]
       },

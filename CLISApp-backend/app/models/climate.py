@@ -82,12 +82,12 @@ CLIMATE_LAYER_CONFIGS = {
     ),
     ClimateLayer.PRECIPITATION: ClimateDataConfig(
         name="Precipitation",
-        description="Hourly precipitation rate",
-        unit="mm/hour",
+        description="Daily precipitation total",
+        unit="mm/day",
         color_scale=["#ffffff", "#87ceeb", "#4169e1", "#0000ff", "#00008b"],
-        thresholds=[0, 0.5, 2, 10, 50],
+        thresholds=[0, 2, 10, 50, 100],
         min_value=0,
-        max_value=100,
+        max_value=200,
         data_source="NASA GPM",
         update_frequency="Daily"
     ),
