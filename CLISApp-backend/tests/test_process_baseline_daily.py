@@ -201,3 +201,148 @@ def test_process_baseline_daily_preserves_na_values_as_null_with_warning(
     assert payload["baselines"]["ssc_30002"]["MT"][34] is None
     assert payload["baselines"]["ssc_30002"]["mT"][34] is None
     assert payload["baselines"]["ssc_30002"]["rf"][34] is None
+
+
+CSV_DAILY_HEADERS = [
+    "MERGED_ID",
+    "doy",
+    "baseline_mT",
+    "baseline_MT",
+    "baseline_rf",
+    "baseline_tmean",
+    "n_years",
+]
+
+
+def _write_daily_csv(
+    path: Path,
+    rows: list[dict[str, object]],
+    *,
+    headers: list[str] = CSV_DAILY_HEADERS,
+    day_column: str = "doy",
+) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(headers)
+        for row in rows:
+            writer.writerow(
+                [row["day"] if column == day_column else row[column] for column in headers]
+            )
+    return path
+
+
+def test_process_baseline_daily_accepts_csv_with_doy_and_no_suburb_name(
+    tmp_path: Path,
+) -> None:
+    input_path = _write_daily_csv(
+        tmp_path / "daily.csv",
+        _complete_rows([30002, 30003]),
+    )
+    yearly_path = _write_yearly_csv(tmp_path / "yearly.csv", [30002, 30003])
+    output_path = tmp_path / "csv_output.json"
+
+    result = process_baseline_daily.process_baseline_daily(
+        input_path=input_path,
+        yearly_input_path=yearly_path,
+        output_path=output_path,
+        generated_at=FIXED_GENERATED_AT,
+        expected_ssc_count=2,
+    )
+
+    payload = _read_payload(output_path)
+    assert result["ssc_count"] == 2
+    assert payload["metadata"]["source"] == "daily.csv"
+    assert payload["metadata"]["missing_ssc_ids"] == []
+    assert payload["metadata"]["partial_ssc_ids"] == {}
+    assert (
+        payload["metadata"]["truncation_note"]
+        == "Daily baseline complete; all SSCs covered against yearly baseline."
+    )
+    assert set(payload["baselines"]) == {"ssc_30002", "ssc_30003"}
+    assert len(payload["baselines"]["ssc_30002"]["tmean"]) == 366
+    assert payload["baselines"]["ssc_30002"]["mT"][0] == 18.0
+    assert payload["baselines"]["ssc_30002"]["MT"][0] == 30.0
+    assert payload["baselines"]["ssc_30002"]["rf"][0] == 2.5
+
+
+def test_process_baseline_daily_csv_partial_records_partial_ssc(tmp_path: Path) -> None:
+    input_path = _write_daily_csv(
+        tmp_path / "partial.csv",
+        [_daily_row(33228, day) for day in range(1, 352)],
+    )
+    yearly_path = _write_yearly_csv(tmp_path / "yearly.csv", [33228])
+    output_path = tmp_path / "csv_partial.json"
+
+    process_baseline_daily.process_baseline_daily(
+        input_path=input_path,
+        yearly_input_path=yearly_path,
+        output_path=output_path,
+        generated_at=FIXED_GENERATED_AT,
+        expected_ssc_count=1,
+    )
+
+    payload = _read_payload(output_path)
+    assert payload["metadata"]["partial_ssc_ids"] == {"33228": 351}
+    assert payload["baselines"]["ssc_33228"]["tmean"][351] is None
+
+
+def test_process_baseline_daily_csv_accepts_day_column_alias(tmp_path: Path) -> None:
+    headers = list(CSV_DAILY_HEADERS)
+    headers[headers.index("doy")] = "day"
+    input_path = _write_daily_csv(
+        tmp_path / "daily_with_day.csv",
+        _complete_rows([30002]),
+        headers=headers,
+        day_column="day",
+    )
+    yearly_path = _write_yearly_csv(tmp_path / "yearly.csv", [30002])
+    output_path = tmp_path / "csv_day_alias.json"
+
+    process_baseline_daily.process_baseline_daily(
+        input_path=input_path,
+        yearly_input_path=yearly_path,
+        output_path=output_path,
+        generated_at=FIXED_GENERATED_AT,
+        expected_ssc_count=1,
+    )
+
+    payload = _read_payload(output_path)
+    assert payload["metadata"]["missing_ssc_ids"] == []
+    assert len(payload["baselines"]["ssc_30002"]["tmean"]) == 366
+
+
+def test_process_baseline_daily_csv_missing_required_column_raises(tmp_path: Path) -> None:
+    headers = [c for c in CSV_DAILY_HEADERS if c != "baseline_mT"]
+    input_path = _write_daily_csv(
+        tmp_path / "broken.csv",
+        _complete_rows([30002]),
+        headers=headers,
+    )
+    yearly_path = _write_yearly_csv(tmp_path / "yearly.csv", [30002])
+    output_path = tmp_path / "broken.json"
+
+    with pytest.raises(process_baseline_daily.BaselineDailyProcessingError, match="baseline_mT"):
+        process_baseline_daily.process_baseline_daily(
+            input_path=input_path,
+            yearly_input_path=yearly_path,
+            output_path=output_path,
+            generated_at=FIXED_GENERATED_AT,
+            expected_ssc_count=1,
+        )
+
+
+def test_process_baseline_daily_unsupported_suffix_raises(tmp_path: Path) -> None:
+    weird_path = tmp_path / "daily.txt"
+    weird_path.write_text("not a real input", encoding="utf-8")
+    yearly_path = _write_yearly_csv(tmp_path / "yearly.csv", [30002])
+    output_path = tmp_path / "weird.json"
+
+    with pytest.raises(process_baseline_daily.BaselineDailyProcessingError, match="Unsupported"):
+        process_baseline_daily.process_baseline_daily(
+            input_path=weird_path,
+            yearly_input_path=yearly_path,
+            output_path=output_path,
+            generated_at=FIXED_GENERATED_AT,
+            expected_ssc_count=1,
+        )
