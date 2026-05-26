@@ -9,7 +9,7 @@ const climate: RegionClimateOverview = {
     { layer: 'temperature', name: 'Temperature', value: 25.3, unit: '°C', riskLevel: 'Good' },
     { layer: 'uv', name: 'UV', value: 6, unit: 'UVI', riskLevel: 'Unhealthy' },
     { layer: 'humidity', name: 'Humidity', value: 62, unit: '%', riskLevel: 'Good' },
-    { layer: 'precipitation', name: 'Precip', value: 0, unit: 'mm/hour', riskLevel: 'Good' },
+    { layer: 'precipitation', name: 'Precip', value: 0, unit: 'mm/day', riskLevel: 'Good' },
   ],
 };
 
@@ -28,10 +28,9 @@ describe('ClimateMetricsGrid', () => {
     renderer.unmount();
   });
 
-  it('shortens the precipitation unit to mm/h', () => {
+  it('displays the precipitation unit as mm/day', () => {
     const renderer = create(<ClimateMetricsGrid climate={climate} />);
-    expect(findText(renderer, 'mm/h').length).toBe(1);
-    expect(findText(renderer, 'mm/hour').length).toBe(0);
+    expect(findText(renderer, 'mm/day').length).toBe(1);
     renderer.unmount();
   });
 
