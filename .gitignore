@@ -207,3 +207,8 @@ _bmad/
 _bmad-output/
 .agents
 .gemini
+
+# ===================================
+# Local Secrets (never commit)
+# ===================================
+.secrets/

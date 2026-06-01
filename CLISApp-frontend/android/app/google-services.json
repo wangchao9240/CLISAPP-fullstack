@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "192027626562",
-    "project_id": "clisapp-ab7ab",
-    "storage_bucket": "clisapp-ab7ab.firebasestorage.app"
+    "project_number": "608489175280",
+    "project_id": "clisapp-prod",
+    "storage_bucket": "clisapp-prod.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:192027626562:android:10ef4c1f458488e4cab1db",
+        "mobilesdk_app_id": "1:608489175280:android:adf7e0bf77b1eb88df2a35",
         "android_client_info": {
           "package_name": "com.clisapp"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAUeUXYv6FREyRxQ_fTyb1FuQGbRRFLmno"
+          "current_key": "AIzaSyDs7VvJ-bqZLwt7sEE3TjOVmSqdwdAc_uo"
         }
       ],
       "services": {
